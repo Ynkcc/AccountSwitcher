@@ -170,6 +170,8 @@ class AccountManager(private val context: Context) {
 
     private fun Context.filesProviderDir(): File = filesDir
 
+    private fun getAccountDir(openid: String): File = File(accountsDir, openid).apply { if (!exists()) mkdirs() }
+
     private fun runDiagnosticsIfNeeded() {
         if (!ENABLE_DIAGNOSTICS) return
         val diag = listOf(
@@ -203,6 +205,31 @@ class AccountManager(private val context: Context) {
         }
     }
 
+    fun refreshOnlineData(openid: String): SaveResult {
+        val datFile = File(getAccountDir(openid), "login.dat")
+        if (!datFile.exists()) return SaveResult(false, error = "本地数据不存在")
+        
+        val data = datFile.readBytes()
+        val decrypted = MSDKTea.decrypt(data, teaKey) ?: return SaveResult(false, error = "解密失败")
+        
+        return try {
+            val json = JSONObject(String(decrypted, Charsets.UTF_8))
+            val account = Account.fromJson(json)
+            val accessToken = account.channelInfo.accessToken
+            if (accessToken.isNotEmpty()) {
+                val info = fetchFullAccountInfo(openid, accessToken)
+                if (info != null) {
+                    saveAccountInfo(openid, info)
+                    prefs.edit().putString(openid, info.roleName).apply()
+                    return SaveResult(true, characName = info.roleName)
+                }
+            }
+            SaveResult(false, error = "获取在线数据失败")
+        } catch (e: Exception) {
+            SaveResult(false, error = "更新失败: ${e.message}")
+        }
+    }
+
     private fun fetchFullAccountInfo(openid: String, accessToken: String): AccountInfo? {
         return try {
             val urlStr = "https://comm.aci.game.qq.com/main?game=cjm&area=2&platid=1&sCloudApiName=ams.gameattr.role"
@@ -215,51 +242,58 @@ class AccountManager(private val context: Context) {
             conn.connectTimeout = 10000
             conn.readTimeout = 10000
 
-            if (conn.responseCode == 200) {
-                val response = conn.inputStream.bufferedReader().use { it.readText() }
-                val match = Regex("data:'(.*?)'").find(response)
-                val encodedData = match?.groupValues?.get(1) ?: return null
-                val decodedData = URLDecoder.decode(encodedData, "UTF-8")
-                
-                val params = mutableMapOf<String, String>()
-                decodedData.split("&").forEach { pair ->
-                    val parts = pair.split("=")
-                    if (parts.size == 2) {
-                        params[parts[0]] = parts[1]
+                val responseCode = conn.responseCode
+                Log.d(TAG, "Sync response code: $responseCode")
+                if (responseCode == 200) {
+                    val response = conn.inputStream.bufferedReader().use { it.readText() }
+                    val match = Regex("data:'(.*?)'").find(response)
+                    if (match == null) {
+                        Log.e(TAG, "No data match in response: $response")
+                        return null
                     }
+                    val encodedData = match.groupValues[1]
+                    val decodedData = URLDecoder.decode(encodedData, "UTF-8")
+                    
+                    val params = mutableMapOf<String, String>()
+                    decodedData.split("&").forEach { pair ->
+                        val parts = pair.split("=")
+                        if (parts.size == 2) {
+                            params[parts[0]] = parts[1]
+                        }
+                    }
+
+                    val lastLogoutTime = params["lastlogouttime"]?.toLongOrNull() ?: 0L
+                    val lastLogoutFormatted = if (lastLogoutTime > 0) {
+                        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(lastLogoutTime * 1000))
+                    } else "未知"
+
+                    AccountInfo(
+                        roleName = params["charac_name"] ?: "未知",
+                        roleId = params["charac_no"] ?: "未知",
+                        level = params["level"] ?: "0",
+                        isOnline = if (params["is_online"] == "1") "在线" else "不在线",
+                        isBan = if (params["isbanuser"] == "1") "已封号" else "正常",
+                        isFace = if (params["schemeindex"] == "1") "是" else "否",
+                        aceMark = params["historyhighestranktimes"] ?: "0",
+                        heatValue = params["reli"] ?: "0",
+                        rank = getRank(params["tppseasonduorating"] ?: "0"),
+                        rankPoints = params["tppseasonduorating"] ?: "0",
+                        lastLogout = lastLogoutFormatted,
+                        totalRecharge = params["accumulatechargenum"] ?: "0",
+                        todayLogin = params["logintoday"] ?: "0"
+                    )
+                } else {
+                    Log.e(TAG, "Sync failed with code: $responseCode")
+                    null
                 }
-
-                val lastLogoutTime = params["lastlogouttime"]?.toLongOrNull() ?: 0L
-                val lastLogoutFormatted = if (lastLogoutTime > 0) {
-                    SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(lastLogoutTime * 1000))
-                } else "未知"
-
-                AccountInfo(
-                    roleName = params["charac_name"] ?: "未知",
-                    roleId = params["charac_no"] ?: "未知",
-                    level = params["level"] ?: "0",
-                    isOnline = if (params["is_online"] == "1") "在线" else "不在线",
-                    isBan = if (params["isbanuser"] == "1") "已封号" else "正常",
-                    isFace = if (params["schemeindex"] == "1") "是" else "否",
-                    aceMark = params["historyhighestranktimes"] ?: "0",
-                    heatValue = params["reli"] ?: "0",
-                    rank = getRank(params["tppseasonduorating"] ?: "0"),
-                    rankPoints = params["tppseasonduorating"] ?: "0",
-                    lastLogout = lastLogoutFormatted,
-                    totalRecharge = params["accumulatechargenum"] ?: "0",
-                    todayLogin = params["logintoday"] ?: "0"
-                )
-            } else {
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch account info: ${e.message}", e)
                 null
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch account info", e)
-            null
-        }
     }
 
     private fun saveAccountInfo(openid: String, info: AccountInfo) {
-        val infoFile = File(accountsDir, "$openid.info")
+        val infoFile = File(getAccountDir(openid), "info.json")
         val json = JSONObject().apply {
             put("roleName", info.roleName)
             put("roleId", info.roleId)
@@ -279,7 +313,7 @@ class AccountManager(private val context: Context) {
     }
 
     fun getAccountInfo(openid: String): AccountInfo? {
-        val infoFile = File(accountsDir, "$openid.info")
+        val infoFile = File(getAccountDir(openid), "info.json")
         if (!infoFile.exists()) return null
         return try {
             val json = JSONObject(infoFile.readText())
@@ -354,7 +388,7 @@ class AccountManager(private val context: Context) {
             }
         }
 
-        val targetFile = File(accountsDir, "$openid.dat")
+        val targetFile = File(getAccountDir(openid), "login.dat")
         try {
             targetFile.writeBytes(data)
             Log.d(TAG, "Successfully saved account for openid: $openid to ${targetFile.absolutePath}")
@@ -366,7 +400,7 @@ class AccountManager(private val context: Context) {
     }
 
     fun switchAccount(openid: String): Boolean {
-        val accountFile = File(accountsDir, "$openid.dat")
+        val accountFile = File(getAccountDir(openid), "login.dat")
         if (!accountFile.exists()) return false
 
         val targetPath = pubgFilePath
@@ -376,11 +410,23 @@ class AccountManager(private val context: Context) {
     }
 
     fun listAccounts(): List<Pair<String, String>> {
-        return accountsDir.listFiles()?.map { file ->
-            val openid = file.nameWithoutExtension
+        migrateIfNeeded()
+        return accountsDir.listFiles { file -> file.isDirectory }?.map { dir ->
+            val openid = dir.name
             val displayName = prefs.getString(openid, null) ?: openid
             openid to displayName
         } ?: emptyList()
+    }
+
+    private fun migrateIfNeeded() {
+        accountsDir.listFiles { file -> file.isFile }?.forEach { file ->
+            val openid = file.nameWithoutExtension
+            val targetDir = getAccountDir(openid)
+            when (file.extension) {
+                "dat" -> file.renameTo(File(targetDir, "login.dat"))
+                "info" -> file.renameTo(File(targetDir, "info.json"))
+            }
+        }
     }
 
     fun clearCurrentAccount(): Boolean {
@@ -389,12 +435,12 @@ class AccountManager(private val context: Context) {
     }
 
     fun deleteAccount(openid: String): Boolean {
-        File(accountsDir, "$openid.info").delete()
-        return File(accountsDir, "$openid.dat").delete()
+        val dir = getAccountDir(openid)
+        return dir.deleteRecursively()
     }
 
     fun getDecryptedLoginData(openid: String): String? {
-        val accountFile = File(accountsDir, "$openid.dat")
+        val accountFile = File(getAccountDir(openid), "login.dat")
         if (!accountFile.exists()) return null
         val data = accountFile.readBytes()
         val decrypted = MSDKTea.decrypt(data, teaKey) ?: return null
@@ -406,3 +452,4 @@ class AccountManager(private val context: Context) {
         }
     }
 }
+

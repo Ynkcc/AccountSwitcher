@@ -15,7 +15,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -68,12 +73,32 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountListScreen(accountManager: AccountManager) {
-    val accounts = remember { accountManager.listAccounts() }
+    var accounts by remember { mutableStateOf(accountManager.listAccounts()) }
     var showDecrypted by remember { mutableStateOf<String?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    // Use Lifecycle listener to refresh on resume
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                accounts = accountManager.listAccounts()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("GSwitcher 账号管理") })
+            TopAppBar(
+                title = { Text("GSwitcher 账号管理") },
+                actions = {
+                    IconButton(onClick = { accounts = accountManager.listAccounts() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "刷新列表")
+                    }
+                }
+            )
         }
     ) { innerPadding ->
         if (accounts.isEmpty()) {
@@ -87,7 +112,14 @@ fun AccountListScreen(accountManager: AccountManager) {
                         openid = openid,
                         displayName = displayName,
                         info = accountManager.getAccountInfo(openid),
-                        onViewDecrypted = { showDecrypted = openid }
+                        onViewDecrypted = { showDecrypted = openid },
+                        onRefreshData = {
+                            val result = accountManager.refreshOnlineData(openid)
+                            if (result.success) {
+                                accounts = accountManager.listAccounts() // Refresh list to show new name if changed
+                            }
+                            result
+                        }
                     )
                 }
             }
@@ -121,8 +153,16 @@ fun AccountListScreen(accountManager: AccountManager) {
 }
 
 @Composable
-fun AccountItem(openid: String, displayName: String, info: AccountInfo?, onViewDecrypted: () -> Unit) {
+fun AccountItem(
+    openid: String,
+    displayName: String,
+    info: AccountInfo?,
+    onViewDecrypted: () -> Unit,
+    onRefreshData: suspend () -> net.game.switcher.manager.SaveResult
+) {
     var expanded by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(8.dp).clickable { expanded = !expanded },
@@ -150,17 +190,35 @@ fun AccountItem(openid: String, displayName: String, info: AccountInfo?, onViewD
                 InfoRow("今日登录", "${info.todayLogin} 次")
                 InfoRow("下线时间", info.lastLogout)
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = onViewDecrypted,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("查看 itop_login.txt 解密数据")
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            scope.launch(Dispatchers.IO) {
+                                val result = onRefreshData()
+                                withContext(Dispatchers.Main) {
+                                    val msg = if (result.success) "数据已更新: ${result.characName}" else "更新失败: ${result.error}"
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                    ) {
+                        Text("同步在线数据")
+                    }
+                    Button(
+                        onClick = onViewDecrypted,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("解密数据")
+                    }
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun InfoRow(label: String, value: String) {
