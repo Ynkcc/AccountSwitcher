@@ -43,3 +43,27 @@ class MSDKTea:
         pos = (out[0] & 7) + 3
         # Trailer: last 7 bytes are ignored
         return out[pos:-7]
+
+if __name__ == "__main__":
+    # The key "ITOPITOPITOPITOP" is hardcoded/generated in libMSDKCore.so
+    key = b"ITOPITOPITOPITOP"
+    file_path = "itop_login.txt"
+    
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "rb") as f:
+                data = f.read()
+            
+            tea = MSDKTea(key)
+            result = tea.decrypt(data)
+            if result:
+                print("Decryption Successful!")
+                print("-" * 20)
+                print(f"JWT Token:\n{result.decode('utf-8', errors='ignore')}")
+                print("-" * 20)
+            else:
+                print("Decryption failed (invalid data or key).")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+    else:
+        print(f"Error: Target file not found at {file_path}")

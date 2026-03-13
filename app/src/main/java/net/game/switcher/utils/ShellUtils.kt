@@ -2,89 +2,77 @@ package net.game.switcher.utils
 
 import android.util.Log
 
-import java.io.DataOutputStream
-
 object ShellUtils {
-    fun execRoot(command: String): Boolean {
+    private const val TAG = "ShellUtils"
+
+    private fun createRootProcess(command: String, useMountMaster: Boolean): Process {
+        val args = if (useMountMaster) {
+            arrayOf("su", "-mm", "-c", command)
+        } else {
+            arrayOf("su", "-c", command)
+        }
+        return Runtime.getRuntime().exec(args)
+    }
+
+    private fun logFailure(command: String, exitCode: Int, errorOutput: String) {
+        Log.e(TAG, "Command failed with exit code $exitCode: $command")
+        if (errorOutput.isNotEmpty()) {
+            Log.e(TAG, "Error output: $errorOutput")
+        }
+    }
+
+    private inline fun <T> runWithRoot(command: String, block: (Process) -> T): T? {
         return try {
-            val process = Runtime.getRuntime().exec(arrayOf("su", "-mm", "-c", command))
-            val result = process.waitFor()
-            if (result != 0) {
-                val errorOutput = process.errorStream.bufferedReader().readText().trim()
-                Log.e("ShellUtils", "Command failed with exit code $result: $command")
-                if (errorOutput.isNotEmpty()) {
-                    Log.e("ShellUtils", "Error output: $errorOutput")
-                }
-            } else {
-                Log.d("ShellUtils", "Command success: $command")
-            }
-            result == 0
+            block(createRootProcess(command, useMountMaster = true))
         } catch (e: Exception) {
-            // Fallback to plain su -c if -mm is not supported
             try {
-                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-                val result = process.waitFor()
-                result == 0
+                block(createRootProcess(command, useMountMaster = false))
             } catch (e2: Exception) {
-                Log.e("ShellUtils", "Exception executing command: $command", e2)
-                false
+                Log.e(TAG, "Exception executing command: $command", e2)
+                null
             }
         }
     }
 
+    fun execRoot(command: String): Boolean {
+        return runWithRoot(command) { process ->
+            val result = process.waitFor()
+            if (result == 0) {
+                Log.d(TAG, "Command success: $command")
+                true
+            } else {
+                val errorOutput = process.errorStream.bufferedReader().readText().trim()
+                logFailure(command, result, errorOutput)
+                false
+            }
+        } ?: false
+    }
+
     fun execRootGetOutput(command: String): String? {
-        return try {
-            val process = Runtime.getRuntime().exec(arrayOf("su", "-mm", "-c", command))
+        return runWithRoot(command) { process ->
             val output = process.inputStream.bufferedReader().readText().trim()
             val result = process.waitFor()
             if (result == 0) {
-                Log.d("ShellUtils", "Command success: $command, output: $output")
+                Log.d(TAG, "Command success: $command, output: $output")
                 output
             } else {
                 val errorOutput = process.errorStream.bufferedReader().readText().trim()
-                Log.e("ShellUtils", "Command failed with exit code $result: $command")
-                if (errorOutput.isNotEmpty()) {
-                    Log.e("ShellUtils", "Error output: $errorOutput")
-                }
-                null
-            }
-        } catch (e: Exception) {
-             try {
-                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-                val output = process.inputStream.bufferedReader().readText().trim()
-                val result = process.waitFor()
-                if (result == 0) output else null
-            } catch (e2: Exception) {
-                Log.e("ShellUtils", "Exception executing command: $command", e2)
+                logFailure(command, result, errorOutput)
                 null
             }
         }
     }
 
     fun execRootGetBytes(command: String): ByteArray? {
-        return try {
-            val process = Runtime.getRuntime().exec(arrayOf("su", "-mm", "-c", command))
+        return runWithRoot(command) { process ->
             val output = process.inputStream.readBytes()
             val result = process.waitFor()
             if (result == 0) {
-                Log.d("ShellUtils", "Command success: $command, bytes=${output.size}")
+                Log.d(TAG, "Command success: $command, bytes=${output.size}")
                 output
             } else {
                 val errorOutput = process.errorStream.bufferedReader().readText().trim()
-                Log.e("ShellUtils", "Command failed with exit code $result: $command")
-                if (errorOutput.isNotEmpty()) {
-                    Log.e("ShellUtils", "Error output: $errorOutput")
-                }
-                null
-            }
-        } catch (e: Exception) {
-            try {
-                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-                val output = process.inputStream.readBytes()
-                val result = process.waitFor()
-                if (result == 0) output else null
-            } catch (e2: Exception) {
-                Log.e("ShellUtils", "Exception executing command: $command", e2)
+                logFailure(command, result, errorOutput)
                 null
             }
         }

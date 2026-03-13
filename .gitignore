@@ -13,6 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
-decrypted_data.txt
 .idea/
 .kotlin
+.vscode/
+decrypted_data.json
+itop_login.txt

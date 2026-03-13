@@ -126,11 +126,17 @@ class FloatingService : Service() {
     }
 
     private fun saveCurrent() {
-        if (accountManager.saveCurrentAccount()) {
-            Toast.makeText(this, "保存成功", Toast.LENGTH_SHORT).show()
-        } else {
-            Log.e("FloatingService", "Save failed, check AccountManager logs")
-            Toast.makeText(this, "保存失败，未识别到登录信息", Toast.LENGTH_SHORT).show()
+        kotlin.concurrent.thread {
+            val result = accountManager.saveCurrentAccount()
+            floatingView.post {
+                if (result.success) {
+                    Toast.makeText(this@FloatingService, "保存成功: ${result.characName}", Toast.LENGTH_SHORT).show()
+                } else {
+                    Log.e("FloatingService", "Save failed: ${result.error}")
+                    val msg = if (result.error != null) "保存失败: ${result.error}" else "保存失败，未识别到登录信息"
+                    Toast.makeText(this@FloatingService, msg, Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
