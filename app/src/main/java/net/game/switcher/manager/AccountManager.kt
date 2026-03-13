@@ -440,13 +440,16 @@ class AccountManager(private val context: Context) {
     }
 
     fun getDecryptedLoginData(openid: String): String? {
+        return getAccountJsonObject(openid)?.toString(4)
+    }
+
+    fun getAccountJsonObject(openid: String): JSONObject? {
         val accountFile = File(getAccountDir(openid), "login.dat")
         if (!accountFile.exists()) return null
         val data = accountFile.readBytes()
         val decrypted = MSDKTea.decrypt(data, teaKey) ?: return null
         return try {
-            val json = JSONObject(String(decrypted, Charsets.UTF_8))
-            json.toString(4)
+            JSONObject(String(decrypted, Charsets.UTF_8))
         } catch (e: Exception) {
             null
         }

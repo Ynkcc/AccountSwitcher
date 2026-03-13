@@ -14,6 +14,8 @@ import androidx.core.app.NotificationCompat
 import net.game.switcher.R
 import net.game.switcher.manager.AccountManager
 import net.game.switcher.utils.ShellUtils
+import com.tencent.open.agent.AgentActivity
+import org.json.JSONObject
 
 class FloatingService : Service() {
     private lateinit var windowManager: WindowManager
@@ -103,7 +105,7 @@ class FloatingService : Service() {
     }
 
     private fun showMenuDialog() {
-        val items = arrayOf("保存当前账号", "切换账号", "清除当前登录", "退出")
+        val items = arrayOf("保存当前账号", "切换账号", "清除当前登录", "选择响应帐号")
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle("GSwitcher")
             .setItems(items) { _, which ->
@@ -111,7 +113,7 @@ class FloatingService : Service() {
                     0 -> saveCurrent()
                     1 -> showAccountList()
                     2 -> clearCurrent()
-                    3 -> stopSelf()
+                    3 -> showAccountListForResponse()
                 }
             }
             .create().apply {
@@ -141,6 +143,18 @@ class FloatingService : Service() {
     }
 
     private fun showAccountList() {
+        showAccountListInternal(false)
+    }
+
+    private fun showAccountListForResponse() {
+        if (!AgentActivity.isActive()) {
+            Toast.makeText(this, "当前无活跃的登录请求", Toast.LENGTH_SHORT).show()
+            return
+        }
+        showAccountListInternal(true)
+    }
+
+    private fun showAccountListInternal(isForResponse: Boolean) {
         val accounts = accountManager.listAccounts()
         if (accounts.isEmpty()) {
             Toast.makeText(this, "没有保存的账号", Toast.LENGTH_SHORT).show()
@@ -149,14 +163,19 @@ class FloatingService : Service() {
 
         val names = accounts.map { it.second }.toTypedArray()
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("选择账号")
+            .setTitle(if (isForResponse) "选择响应账号" else "选择账号")
             .setItems(names) { _, which ->
                 val openid = accounts[which].first
                 val displayName = accounts[which].second
-                if (accountManager.switchAccount(openid)) {
-                    Toast.makeText(this, "已切换到 $displayName，请重启游戏", Toast.LENGTH_LONG).show()
+                
+                if (isForResponse) {
+                    handleResponse(openid)
                 } else {
-                    Toast.makeText(this, "切换失败", Toast.LENGTH_SHORT).show()
+                    if (accountManager.switchAccount(openid)) {
+                        Toast.makeText(this, "已切换到 $displayName，请重启游戏", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(this, "切换失败", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .setNeutralButton("管理") { _, _ -> showManageAccounts() }
@@ -169,6 +188,33 @@ class FloatingService : Service() {
                 )
                 show()
             }
+    }
+
+    private fun handleResponse(openid: String) {
+        val accountJson = accountManager.getAccountJsonObject(openid)
+        if (accountJson == null) {
+            Toast.makeText(this, "无法读取账号数据", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val channelInfo = accountJson.getJSONObject("channel_info")
+            
+            val responseJson = JSONObject().apply {
+                put("access_token", channelInfo.optString("access_token"))
+                put("openid", accountJson.optString("openid"))
+                put("pay_token", channelInfo.optString("pay_token"))
+                put("ret", 0) // 必须为 0，表示成功
+                put("pf", accountJson.optString("pf"))
+                put("page_type", "1")
+            }
+            
+            AgentActivity.sendResponse(responseJson.toString())
+            Toast.makeText(this, "响应成功", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e("FloatingService", "Build response failed", e)
+            Toast.makeText(this, "构建响应数据失败", Toast.LENGTH_SHORT).show()
+        }
     }
     
     private fun showManageAccounts() {
