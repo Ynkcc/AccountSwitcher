@@ -110,16 +110,10 @@ fun AccountListScreen(accountManager: AccountManager) {
                 items(accounts) { (openid, displayName) ->
                     AccountItem(
                         openid = openid,
-                        displayName = displayName,
-                        info = accountManager.getAccountInfo(openid),
+                        initialDisplayName = displayName,
+                        accountManager = accountManager,
                         onViewDecrypted = { showDecrypted = openid },
-                        onRefreshData = {
-                            val result = accountManager.refreshOnlineData(openid)
-                            if (result.success) {
-                                accounts = accountManager.listAccounts() // Refresh list to show new name if changed
-                            }
-                            result
-                        }
+                        onNameChanged = { accounts = accountManager.listAccounts() }
                     )
                 }
             }
@@ -155,14 +149,22 @@ fun AccountListScreen(accountManager: AccountManager) {
 @Composable
 fun AccountItem(
     openid: String,
-    displayName: String,
-    info: AccountInfo?,
+    initialDisplayName: String,
+    accountManager: AccountManager,
     onViewDecrypted: () -> Unit,
-    onRefreshData: suspend () -> com.tencent.tim.manager.SaveResult
+    onNameChanged: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var displayName by remember { mutableStateOf(initialDisplayName) }
+    var info by remember { mutableStateOf(accountManager.getAccountInfo(openid)) }
+    
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Sync displayName if it changes from parent
+    LaunchedEffect(initialDisplayName) {
+        displayName = initialDisplayName
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(8.dp).clickable { expanded = !expanded },
@@ -172,33 +174,52 @@ fun AccountItem(
             Text(text = displayName, style = MaterialTheme.typography.titleLarge)
             Text(text = "OpenID: $openid", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             
-            if (expanded && info != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Divider()
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                InfoRow("角色编号", info.roleId)
-                InfoRow("账号等级", info.level)
-                InfoRow("段位信息", info.rank)
-                InfoRow("段位积分", info.rankPoints)
-                InfoRow("当前状态", info.isOnline)
-                InfoRow("封号状态", info.isBan)
-                InfoRow("人脸验证", info.isFace)
-                InfoRow("王牌印记", info.aceMark)
-                InfoRow("热力值", info.heatValue)
-                InfoRow("充值总额", info.totalRecharge)
-                InfoRow("今日登录", "${info.todayLogin} 次")
-                InfoRow("下线时间", info.lastLogout)
+            if (expanded) {
+                if (info == null) {
+                    info = accountManager.getAccountInfo(openid)
+                }
+
+                if (info != null) {
+                    val currentInfo = info!!
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Divider()
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    InfoRow("角色编号", currentInfo.roleId)
+                    InfoRow("账号等级", currentInfo.level)
+                    InfoRow("段位信息", currentInfo.rank)
+                    InfoRow("段位积分", currentInfo.rankPoints)
+                    InfoRow("当前状态", currentInfo.isOnline)
+                    InfoRow("封号状态", currentInfo.isBan)
+                    InfoRow("人脸验证", currentInfo.isFace)
+                    InfoRow("王牌印记", currentInfo.aceMark)
+                    InfoRow("热力值", currentInfo.heatValue)
+                    InfoRow("充值总额", currentInfo.totalRecharge)
+                    InfoRow("今日登录", "${currentInfo.todayLogin} 次")
+                    InfoRow("下线时间", currentInfo.lastLogout)
+                } else {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("暂无详细数据", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                }
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
                             scope.launch(Dispatchers.IO) {
-                                val result = onRefreshData()
+                                val result = accountManager.refreshOnlineData(openid)
                                 withContext(Dispatchers.Main) {
-                                    val msg = if (result.success) "数据已更新: ${result.characName}" else "更新失败: ${result.error}"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    if (result.success) {
+                                        val newInfo = accountManager.getAccountInfo(openid)
+                                        info = newInfo
+                                        if (result.characName != null && result.characName != displayName) {
+                                            displayName = result.characName
+                                            onNameChanged()
+                                        }
+                                        Toast.makeText(context, "数据已同步: ${result.characName}", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "同步失败: ${result.error}", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         },
