@@ -1,4 +1,4 @@
-package net.game.switcher
+package net.game.tim
 
 import org.junit.Test
 

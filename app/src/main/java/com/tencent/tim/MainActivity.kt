@@ -1,4 +1,4 @@
-package net.game.switcher
+package com.tencent.tim
 
 import android.content.Intent
 import android.net.Uri
@@ -25,11 +25,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import net.game.switcher.manager.AccountManager
-import net.game.switcher.manager.AccountInfo
-import net.game.switcher.service.FloatingService
-import net.game.switcher.utils.ShellUtils
-import net.game.switcher.ui.theme.GSwitcherTheme
+import com.tencent.tim.manager.AccountManager
+import com.tencent.tim.manager.AccountInfo
+import com.tencent.tim.service.FloatingService
+import com.tencent.tim.utils.ShellUtils
+import com.tencent.tim.ui.theme.GSwitcherTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var accountManager: AccountManager
@@ -158,7 +158,7 @@ fun AccountItem(
     displayName: String,
     info: AccountInfo?,
     onViewDecrypted: () -> Unit,
-    onRefreshData: suspend () -> net.game.switcher.manager.SaveResult
+    onRefreshData: suspend () -> com.tencent.tim.manager.SaveResult
 ) {
     var expanded by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current

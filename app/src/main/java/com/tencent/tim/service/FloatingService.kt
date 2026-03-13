@@ -1,7 +1,6 @@
-package net.game.switcher.service
+package com.tencent.tim.service
 
 import android.app.*
-import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -11,9 +10,8 @@ import android.view.*
 import android.widget.*
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import net.game.switcher.R
-import net.game.switcher.manager.AccountManager
-import net.game.switcher.utils.ShellUtils
+import com.tencent.tim.R
+import com.tencent.tim.manager.AccountManager
 import com.tencent.open.agent.AgentActivity
 import org.json.JSONObject
 

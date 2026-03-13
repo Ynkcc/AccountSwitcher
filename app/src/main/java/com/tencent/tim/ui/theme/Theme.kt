@@ -1,6 +1,5 @@
-package net.game.switcher.ui.theme
+package com.tencent.tim.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

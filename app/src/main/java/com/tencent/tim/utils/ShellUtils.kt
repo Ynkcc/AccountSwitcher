@@ -1,4 +1,4 @@
-package net.game.switcher.utils
+package com.tencent.tim.utils
 
 import android.util.Log
 

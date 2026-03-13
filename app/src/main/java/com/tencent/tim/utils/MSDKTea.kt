@@ -1,4 +1,4 @@
-package net.game.switcher.utils
+package com.tencent.tim.utils
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

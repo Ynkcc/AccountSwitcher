@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "net.game.switcher"
+    namespace = "com.tencent.tim"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "net.game.switcher"
+        applicationId = "com.tencent.tim"
         minSdk = 29
         targetSdk = 36
         versionCode = 1

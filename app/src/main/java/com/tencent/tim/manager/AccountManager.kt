@@ -1,9 +1,9 @@
-package net.game.switcher.manager
+package com.tencent.tim.manager
 
 import android.content.Context
 import android.util.Log
-import net.game.switcher.utils.MSDKTea
-import net.game.switcher.utils.ShellUtils
+import com.tencent.tim.utils.MSDKTea
+import com.tencent.tim.utils.ShellUtils
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
