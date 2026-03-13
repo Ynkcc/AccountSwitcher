@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.activity.result.contract.ActivityResultContracts
 import com.tencent.tim.manager.AccountManager
 import com.tencent.tim.manager.AccountInfo
 import com.tencent.tim.service.FloatingService
@@ -33,6 +34,14 @@ import com.tencent.tim.ui.theme.GSwitcherTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var accountManager: AccountManager
+
+    private val overlayPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (Settings.canDrawOverlays(this)) {
+            startService(Intent(this, FloatingService::class.java))
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,7 +56,7 @@ class MainActivity : ComponentActivity() {
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName")
             )
-            startActivityForResult(intent, 1001)
+            overlayPermissionLauncher.launch(intent)
         } else {
             startService(Intent(this, FloatingService::class.java))
         }
@@ -60,14 +69,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1001) {
-            if (Settings.canDrawOverlays(this)) {
-                startService(Intent(this, FloatingService::class.java))
-            }
-        }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -182,7 +183,7 @@ fun AccountItem(
                 if (info != null) {
                     val currentInfo = info!!
                     Spacer(modifier = Modifier.height(8.dp))
-                    Divider()
+                    HorizontalDivider()
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     InfoRow("角色编号", currentInfo.roleId)

@@ -38,10 +38,7 @@ class FloatingService : Service() {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -116,10 +113,7 @@ class FloatingService : Service() {
             }
             .create().apply {
                 window?.setType(
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                    else
-                        WindowManager.LayoutParams.TYPE_PHONE
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 )
                 show()
             }
@@ -179,10 +173,7 @@ class FloatingService : Service() {
             .setNeutralButton("管理") { _, _ -> showManageAccounts() }
             .create().apply {
                 window?.setType(
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                    else
-                        WindowManager.LayoutParams.TYPE_PHONE
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 )
                 show()
             }
@@ -228,10 +219,7 @@ class FloatingService : Service() {
             }
             .create().apply {
                 window?.setType(
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                    else
-                        WindowManager.LayoutParams.TYPE_PHONE
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 )
                 show()
             }

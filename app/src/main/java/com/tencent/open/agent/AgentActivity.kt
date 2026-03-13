@@ -33,11 +33,7 @@ class AgentActivity : Activity() {
         
         // 打印请求参数
         Log.d(TAG, "AgentActivity started with intent: ${intent?.extras?.let { extras -> 
-            val sb = StringBuilder()
-            for (key in extras.keySet()) {
-                sb.append("$key=${extras.get(key)}; ")
-            }
-            sb.toString()
+            extras.keySet().joinToString("; ") { key -> "$key=${extras.get(key)}" }
         } ?: "No extras"}")
 
         // Note: The UI for choosing the account will be handled by the FloatingService menu.
