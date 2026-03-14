@@ -10,6 +10,9 @@ import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -460,19 +463,34 @@ fun AccountDetailsDialog(
     account: AccountUiModel,
     onDismiss: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = "账号详情: ${account.roleName}") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                DetailRow("Role ID", account.roleId)
-                DetailRow("Level", account.level)
-                DetailRow("Rank", account.rank)
-                DetailRow("OpenID", account.openid)
-                DetailRow("Online", account.isOnline)
-                DetailRow("Ban Status", account.isBan)
-                DetailRow("Heat Value", account.heatValue)
-                DetailRow("Last Logout", account.lastLogoutText)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(scrollState)
+            ) {
+                Text(
+                    text = "${account.roleName} | ${account.openid}",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Text(
+                    text = "以下为本地存储的紧凑原始字段（key=value）",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray
+                )
+                SelectionContainer {
+                    Text(
+                        text = account.rawCompactData,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         },
         confirmButton = {
@@ -481,12 +499,4 @@ fun AccountDetailsDialog(
             }
         }
     )
-}
-
-@Composable
-fun DetailRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(text = "$label: ", style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.weight(1f))
-        Text(text = value, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
-    }
 }

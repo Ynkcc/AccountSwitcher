@@ -19,6 +19,7 @@ data class AccountUiModel(
     val rank: String,
     val rankPoints: String,
     val lastLogoutText: String,
+    val rawCompactData: String,
     val isSelected: Boolean
 )
 
@@ -36,8 +37,47 @@ fun AccountEntity.toUiModel(): AccountUiModel {
         rank = rank,
         rankPoints = rankPoints,
         lastLogoutText = formatLastLogoutText(lastLogoutTs),
+        rawCompactData = buildRawCompactData(),
         isSelected = isSelected
     )
+}
+
+private fun AccountEntity.buildRawCompactData(): String {
+    val fields = listOf(
+        "openid" to openid,
+        "roleName" to roleName,
+        "roleId" to roleId,
+        "level" to level,
+        "isOnline" to isOnline,
+        "isBan" to isBan,
+        "isFace" to isFace,
+        "aceMark" to aceMark,
+        "heatValue" to heatValue,
+        "rank" to rank,
+        "rankPoints" to rankPoints,
+        "lastLogoutTs" to lastLogoutTs.toString(),
+        "lastUpdateTs" to lastUpdateTs.toString(),
+        "accessToken" to accessToken,
+        "payToken" to payToken,
+        "expired" to expired.toString(),
+        "expireTs" to expireTs.toString(),
+        "healthGameExt" to healthGameExt,
+        "pf" to pf,
+        "pfKey" to pfKey,
+        "uid" to uid,
+        "channel" to channel,
+        "channelId" to channelId.toString(),
+        "token" to token,
+        "gender" to gender.toString(),
+        "birthdate" to birthdate,
+        "pictureUrl" to pictureUrl,
+        "userName" to userName,
+        "isSelected" to isSelected.toString()
+    )
+
+    return fields.joinToString(separator = "\n") { (key, value) ->
+        "$key=$value"
+    }
 }
 
 private fun formatLastLogoutText(lastLogoutTs: Long): String {
