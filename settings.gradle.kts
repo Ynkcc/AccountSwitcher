@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "G-Switcher"
+rootProject.name = "AccountSwitcher"
 include(":app")
  

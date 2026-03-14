@@ -184,7 +184,7 @@ class MainViewModel(
                 return@launch
             }
 
-            val fileName = "gswitcher_accounts_${LocalDateTime.now().format(exportFileNameFormatter)}.json"
+            val fileName = "accountswitcher_accounts_${LocalDateTime.now().format(exportFileNameFormatter)}.json"
             _effect.emit(MainEffect.PickExportAccountsFile(fileName))
         }
     }

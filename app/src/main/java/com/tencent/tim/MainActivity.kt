@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.tencent.tim.ui.main.AccountListScreen
-import com.tencent.tim.ui.theme.GSwitcherTheme
+import com.tencent.tim.ui.theme.AccountSwitcherTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -14,7 +14,7 @@ class MainActivity : ComponentActivity() {
         
         enableEdgeToEdge()
         setContent {
-            GSwitcherTheme {
+            AccountSwitcherTheme {
                 AccountListScreen()
             }
         }

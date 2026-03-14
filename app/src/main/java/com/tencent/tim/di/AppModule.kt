@@ -27,7 +27,7 @@ val appModule = module {
         Room.databaseBuilder(
             androidContext(),
             AppDatabase::class.java,
-            "gswitcher_db"
+            "accountswitcher_db"
         ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigration(false)
             .build()

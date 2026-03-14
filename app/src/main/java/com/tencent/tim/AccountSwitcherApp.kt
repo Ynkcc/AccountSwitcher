@@ -13,9 +13,9 @@ import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import org.koin.java.KoinJavaComponent.getKoin
 
-class GSwitcherApp : Application() {
+class AccountSwitcherApp : Application() {
     companion object {
-        private const val TAG = "GSwitcherApp"
+        private const val TAG = "AccountSwitcherApp"
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -26,7 +26,7 @@ class GSwitcherApp : Application() {
         // Start Koin
         startKoin {
             androidLogger()
-            androidContext(this@GSwitcherApp)
+            androidContext(this@AccountSwitcherApp)
             modules(appModule)
         }
 

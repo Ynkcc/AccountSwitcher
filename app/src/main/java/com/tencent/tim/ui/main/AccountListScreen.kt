@@ -107,7 +107,7 @@ fun AccountListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("GSwitcher") },
+                title = { Text("AccountSwitcher") },
                 actions = {
                     val isShizukuMode = state.operationMode == OperationMode.SHIZUKU
                     
