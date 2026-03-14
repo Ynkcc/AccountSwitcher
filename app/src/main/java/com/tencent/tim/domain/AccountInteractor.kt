@@ -26,4 +26,10 @@ class AccountInteractor(
     suspend fun setSelectedAccount(openid: String) = repository.setSelectedAccount(openid)
 
     suspend fun getSelectedAccount() = repository.getSelectedAccount()
+
+    suspend fun manualImportAccount(
+        accessToken: String,
+        openid: String,
+        payToken: String
+    ) = repository.manualImportAccount(accessToken, openid, payToken)
 }

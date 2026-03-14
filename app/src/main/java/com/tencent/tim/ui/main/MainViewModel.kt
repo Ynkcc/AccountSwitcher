@@ -61,6 +61,11 @@ class MainViewModel(
             is MainIntent.RestartApp -> restartApp()
             is MainIntent.HideQQ -> hideQQ()
             is MainIntent.RestoreQQ -> restoreQQ()
+            is MainIntent.ManualImportAccount -> manualImportAccount(
+                accessToken = intent.accessToken,
+                openid = intent.openid,
+                payToken = intent.payToken
+            )
             is MainIntent.RequestShizukuPermission -> requestShizukuPermission()
             is MainIntent.CheckModes -> checkModes()
         }
@@ -199,6 +204,24 @@ class MainViewModel(
                 }
                 .onFailure { error ->
                     _effect.emit(MainEffect.ShowToast("在线信息刷新失败: ${error.message}"))
+                }
+            _state.update { it.copy(isLoading = false) }
+        }
+    }
+
+    private fun manualImportAccount(
+        accessToken: String,
+        openid: String,
+        payToken: String
+    ) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            interactor.manualImportAccount(accessToken, openid, payToken)
+                .onSuccess { roleName ->
+                    _effect.emit(MainEffect.ShowToast("手动导入成功: $roleName"))
+                }
+                .onFailure { error ->
+                    _effect.emit(MainEffect.ShowToast("手动导入失败: ${error.message}"))
                 }
             _state.update { it.copy(isLoading = false) }
         }

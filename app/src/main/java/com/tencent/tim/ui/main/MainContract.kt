@@ -25,6 +25,11 @@ sealed class MainIntent {
     object RestartApp : MainIntent()
     object HideQQ : MainIntent()
     object RestoreQQ : MainIntent()
+    data class ManualImportAccount(
+        val accessToken: String,
+        val openid: String,
+        val payToken: String
+    ) : MainIntent()
     object RequestShizukuPermission : MainIntent()
     object CheckModes : MainIntent()
 }

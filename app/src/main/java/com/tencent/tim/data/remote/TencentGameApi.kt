@@ -4,6 +4,7 @@ import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Query
+import retrofit2.http.Url
 
 interface TencentGameApi {
     @GET("main")
@@ -15,5 +16,10 @@ interface TencentGameApi {
         @Header("Cookie") cookie: String,
         @Header("Referer") referer: String = "https://gp.qq.com/",
         @Header("User-Agent") ua: String = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    ): Response<String>
+
+    @GET
+    suspend fun queryQqOpenId(
+        @Url url: String
     ): Response<String>
 }

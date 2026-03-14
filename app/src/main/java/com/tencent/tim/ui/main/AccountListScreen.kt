@@ -42,6 +42,7 @@ fun AccountListScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     var showDetailsAccount by remember { mutableStateOf<AccountUiModel?>(null) }
+    var showManualImportDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.effect.collectLatest { effect ->
@@ -56,6 +57,22 @@ fun AccountListScreen(
         AccountDetailsDialog(
             account = showDetailsAccount!!,
             onDismiss = { showDetailsAccount = null }
+        )
+    }
+
+    if (showManualImportDialog) {
+        ManualImportDialog(
+            onDismiss = { showManualImportDialog = false },
+            onConfirm = { accessToken, openid, payToken ->
+                viewModel.handleIntent(
+                    MainIntent.ManualImportAccount(
+                        accessToken = accessToken,
+                        openid = openid,
+                        payToken = payToken
+                    )
+                )
+                showManualImportDialog = false
+            }
         )
     }
 
@@ -110,7 +127,8 @@ fun AccountListScreen(
             // 工具占位区域
             ToolPlaceholderSection(
                 onHideQQ = { viewModel.handleIntent(MainIntent.HideQQ) },
-                onRestoreQQ = { viewModel.handleIntent(MainIntent.RestoreQQ) }
+                onRestoreQQ = { viewModel.handleIntent(MainIntent.RestoreQQ) },
+                onManualImport = { showManualImportDialog = true }
             )
 
             if (state.isLoading) {
@@ -238,7 +256,8 @@ fun ModeChip(
 @Composable
 fun ToolPlaceholderSection(
     onHideQQ: () -> Unit,
-    onRestoreQQ: () -> Unit
+    onRestoreQQ: () -> Unit,
+    onManualImport: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -253,25 +272,49 @@ fun ToolPlaceholderSection(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(112.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(
-                    onClick = onHideQQ,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.VisibilityOff, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("隐藏QQ")
+                    Button(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        onClick = onHideQQ,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.VisibilityOff, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("隐藏QQ")
+                    }
+
+                    Button(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        onClick = onRestoreQQ,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.Visibility, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("恢复QQ")
+                    }
                 }
-                
-                Button(
-                    onClick = onRestoreQQ,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+
+                OutlinedButton(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    onClick = onManualImport
                 ) {
-                    Icon(Icons.Default.Visibility, contentDescription = null)
+                    Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("恢复QQ")
+                    Text("手动导入")
                 }
             }
             
@@ -284,6 +327,63 @@ fun ToolPlaceholderSection(
             )
         }
     }
+}
+
+@Composable
+fun ManualImportDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (accessToken: String, openid: String, payToken: String) -> Unit
+) {
+    var accessToken by remember { mutableStateOf("") }
+    var openid by remember { mutableStateOf("") }
+    var payToken by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("手动导入 QQ 账号") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = accessToken,
+                    onValueChange = { accessToken = it.trim() },
+                    label = { Text("access_token（必填）") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = openid,
+                    onValueChange = { openid = it.trim() },
+                    label = { Text("openid（可选）") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = payToken,
+                    onValueChange = { payToken = it.trim() },
+                    label = { Text("pay_token（可选，默认留空）") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "仅填写 access_token 也可导入，系统会自动校验并获取对应 openid。",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = accessToken.isNotBlank(),
+                onClick = { onConfirm(accessToken, openid, payToken) }
+            ) {
+                Text("导入")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 
 // 补充 infoContainer 颜色定义 (如果主题中没有)

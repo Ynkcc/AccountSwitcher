@@ -13,7 +13,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
-import java.net.URLDecoder
 
 class AccountRepository(
     private val accountDao: AccountDao,
@@ -23,6 +22,8 @@ class AccountRepository(
 ) {
     companion object {
         private const val TAG = "AccountRepository"
+        private const val QQ_GAME_APP_ID = "1106467070"
+        private const val QQ_ME_URL = "https://openmobile.qq.com/oauth2.0/me"
     }
 
     val allAccounts: Flow<List<AccountEntity>> = accountDao.getAllAccounts()
@@ -39,6 +40,44 @@ class AccountRepository(
             accountDao.insertAccount(entity)
             entity.roleName
         }
+    }
+
+    suspend fun manualImportAccount(
+        accessToken: String,
+        openid: String,
+        payToken: String
+    ): Result<String> = runCatching {
+        val normalizedAccessToken = accessToken.trim()
+        val normalizedOpenidInput = openid.trim()
+        val normalizedPayToken = payToken.trim()
+
+        require(normalizedAccessToken.isNotBlank()) { "access_token 不能为空" }
+
+        val openidFromApi = fetchOpenidByAccessToken(normalizedAccessToken)
+        val targetOpenid = when {
+            normalizedOpenidInput.isBlank() -> openidFromApi
+            normalizedOpenidInput.equals(openidFromApi, ignoreCase = true) -> normalizedOpenidInput
+            else -> throw IllegalArgumentException("填写的 openid 与 access_token 对应账号不一致")
+        }
+
+        val existing = accountDao.getAccountByOpenid(targetOpenid)
+        val template = if (existing == null) fileDataSource.readCurrentAccount().getOrNull() else null
+
+        val entity = buildManualImportEntity(
+            openid = targetOpenid,
+            accessToken = normalizedAccessToken,
+            payToken = normalizedPayToken,
+            existing = existing,
+            template = template
+        )
+
+        fetchRemoteRoleInfo(targetOpenid, normalizedAccessToken)?.let { remoteInfo ->
+            applyRemoteInfo(entity, remoteInfo)
+        }
+        entity.lastUpdateTs = System.currentTimeMillis()
+
+        accountDao.insertAccount(entity)
+        entity.roleName
     }
 
     suspend fun switchAccount(openid: String): Result<Unit> {
@@ -96,6 +135,89 @@ class AccountRepository(
             Log.e(TAG, "Fetch remote info failed", e)
             null
         }
+    }
+
+    private suspend fun fetchOpenidByAccessToken(accessToken: String): String {
+        val response = api.queryQqOpenId("$QQ_ME_URL?access_token=$accessToken")
+        if (!response.isSuccessful) {
+            throw IllegalStateException("校验 access_token 失败: HTTP ${response.code()}")
+        }
+
+        val body = response.body().orEmpty()
+        val jsonText = extractCallbackJson(body)
+            ?: throw IllegalStateException("QQ 返回数据格式异常")
+        val json = JSONObject(jsonText)
+
+        val clientId = json.optString("client_id")
+        if (clientId != QQ_GAME_APP_ID) {
+            throw IllegalArgumentException("该 access_token 不属于本游戏")
+        }
+
+        val openid = json.optString("openid")
+        if (openid.isBlank()) {
+            throw IllegalStateException("未获取到 openid")
+        }
+        return openid
+    }
+
+    private fun extractCallbackJson(raw: String): String? {
+        val start = raw.indexOf('{')
+        val end = raw.lastIndexOf('}')
+        if (start < 0 || end <= start) {
+            return null
+        }
+        return raw.substring(start, end + 1)
+    }
+
+    private fun buildManualImportEntity(
+        openid: String,
+        accessToken: String,
+        payToken: String,
+        existing: AccountEntity?,
+        template: AccountEntity?
+    ): AccountEntity {
+        val base = existing
+            ?: template?.copy(openid = openid, isSelected = false)
+            ?: AccountEntity(openid = openid)
+
+        val entity = base.copy(openid = openid, isSelected = false)
+        entity.accessToken = accessToken
+        entity.payToken = payToken
+        entity.uid = openid
+        entity.token = accessToken
+        entity.channel = "QQ"
+        entity.channelId = 2
+
+        entity.pf = if (entity.pf.isBlank()) {
+            buildDefaultPf(openid)
+        } else {
+            rewritePfOpenid(entity.pf, openid)
+        }
+
+        if (entity.expired <= 0) {
+            entity.expired = 2_592_000
+        }
+        if (entity.expireTs <= 0L) {
+            entity.expireTs = (System.currentTimeMillis() / 1000) + entity.expired
+        }
+        if (entity.roleName.isBlank() || entity.roleName == "未知") {
+            entity.roleName = openid
+        }
+
+        return entity
+    }
+
+    private fun rewritePfOpenid(currentPf: String, openid: String): String {
+        val parts = currentPf.split("-")
+        return if (parts.size >= 2) {
+            parts.dropLast(1).plus(openid).joinToString("-")
+        } else {
+            buildDefaultPf(openid)
+        }
+    }
+
+    private fun buildDefaultPf(openid: String): String {
+        return "qq_qq-10159208-android-10017385-qq-$QQ_GAME_APP_ID-$openid"
     }
 
     suspend fun deleteAccount(openid: String) {
