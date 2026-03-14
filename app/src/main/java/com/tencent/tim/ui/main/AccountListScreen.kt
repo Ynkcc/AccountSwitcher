@@ -27,6 +27,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -136,79 +138,178 @@ fun AccountListScreen(
             )
         }
     ) { padding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 模式指示器区域
-            ModeIndicatorSection(
-                operationMode = state.operationMode,
-                isRootAvailable = state.isRootAvailable,
-                isShizukuAvailable = state.isShizukuAvailable,
-                onRequestShizuku = { viewModel.handleIntent(MainIntent.RequestShizukuPermission) },
-                onCheckModes = { viewModel.handleIntent(MainIntent.CheckModes) }
-            )
+            val isWideScreen = maxWidth > 600.dp
 
-            // 工具占位区域
-            ToolPlaceholderSection(
-                enabled = !state.isLoading,
-                onHideQQ = { viewModel.handleIntent(MainIntent.HideQQ) },
-                onRestoreQQ = { viewModel.handleIntent(MainIntent.RestoreQQ) },
-                onManualImport = { showManualImportDialog = true },
-                onExportToFile = { viewModel.handleIntent(MainIntent.RequestExportAccountsToFile) },
-                onImportFromFile = { viewModel.handleIntent(MainIntent.RequestImportAccountsFromFile) }
-            )
-
-            if (state.isLoading) {
-                Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            
-            if (state.operationMode == OperationMode.SHIZUKU) {
-                Surface(
-                    color = MaterialTheme.colorScheme.infoContainer.copy(alpha = 0.3f),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Row(
-                        modifier = Modifier.padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            if (isWideScreen) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .widthIn(min = 280.dp, max = 380.dp)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
                     ) {
-                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Shizuku 模式下仅支持 Intent 登录（勾选账号后直接打开游戏）",
-                            style = MaterialTheme.typography.bodySmall
+                        ModeIndicatorSection(
+                            operationMode = state.operationMode,
+                            isRootAvailable = state.isRootAvailable,
+                            isShizukuAvailable = state.isShizukuAvailable,
+                            onRequestShizuku = { viewModel.handleIntent(MainIntent.RequestShizukuPermission) },
+                            onCheckModes = { viewModel.handleIntent(MainIntent.CheckModes) }
                         )
-                    }
-                }
-            }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(state.accounts, key = { it.openid }) { account ->
-                    SwipeToRevealDelete(
-                        onDelete = { viewModel.handleIntent(MainIntent.DeleteAccount(account.openid)) }
-                    ) {
-                        AccountItem(
-                            account = account,
-                            onSelected = { viewModel.handleIntent(MainIntent.SetSelectedAccount(account.openid)) },
-                            onPlay = { 
-                                if (state.operationMode == OperationMode.SHIZUKU) {
-                                    viewModel.handleIntent(MainIntent.RestartApp)
-                                } else {
-                                    viewModel.handleIntent(MainIntent.SwitchAndPlay(account.openid)) 
+                        ToolPlaceholderSection(
+                            enabled = !state.isLoading,
+                            onHideQQ = { viewModel.handleIntent(MainIntent.HideQQ) },
+                            onRestoreQQ = { viewModel.handleIntent(MainIntent.RestoreQQ) },
+                            onManualImport = { showManualImportDialog = true },
+                            onExportToFile = { viewModel.handleIntent(MainIntent.RequestExportAccountsToFile) },
+                            onImportFromFile = { viewModel.handleIntent(MainIntent.RequestImportAccountsFromFile) }
+                        )
+
+                        if (state.isLoading) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+
+                        if (state.operationMode == OperationMode.SHIZUKU) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.infoContainer.copy(alpha = 0.3f),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                shape = RectangleShape
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Shizuku 模式下仅支持 Intent 登录（勾选账号后直接打开游戏）",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
-                            },
-                            onShowDetails = { viewModel.handleIntent(MainIntent.ShowAccountDetails(account)) }
-                        )
+                            }
+                        }
                     }
+
+                    VerticalDivider(modifier = Modifier.fillMaxHeight())
+
+                    AccountListSection(
+                        accounts = state.accounts,
+                        operationMode = state.operationMode,
+                        onDelete = { openid -> viewModel.handleIntent(MainIntent.DeleteAccount(openid)) },
+                        onSelected = { openid -> viewModel.handleIntent(MainIntent.SetSelectedAccount(openid)) },
+                        onSwitchAndPlay = { openid -> viewModel.handleIntent(MainIntent.SwitchAndPlay(openid)) },
+                        onRestartApp = { viewModel.handleIntent(MainIntent.RestartApp) },
+                        onShowDetails = { account -> viewModel.handleIntent(MainIntent.ShowAccountDetails(account)) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    )
                 }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    ModeIndicatorSection(
+                        operationMode = state.operationMode,
+                        isRootAvailable = state.isRootAvailable,
+                        isShizukuAvailable = state.isShizukuAvailable,
+                        onRequestShizuku = { viewModel.handleIntent(MainIntent.RequestShizukuPermission) },
+                        onCheckModes = { viewModel.handleIntent(MainIntent.CheckModes) }
+                    )
+
+                    ToolPlaceholderSection(
+                        enabled = !state.isLoading,
+                        onHideQQ = { viewModel.handleIntent(MainIntent.HideQQ) },
+                        onRestoreQQ = { viewModel.handleIntent(MainIntent.RestoreQQ) },
+                        onManualImport = { showManualImportDialog = true },
+                        onExportToFile = { viewModel.handleIntent(MainIntent.RequestExportAccountsToFile) },
+                        onImportFromFile = { viewModel.handleIntent(MainIntent.RequestImportAccountsFromFile) }
+                    )
+
+                    if (state.isLoading) {
+                        Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+
+                    if (state.operationMode == OperationMode.SHIZUKU) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.infoContainer.copy(alpha = 0.3f),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            shape = RectangleShape
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Shizuku 模式下仅支持 Intent 登录（勾选账号后直接打开游戏）",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+
+                    AccountListSection(
+                        accounts = state.accounts,
+                        operationMode = state.operationMode,
+                        onDelete = { openid -> viewModel.handleIntent(MainIntent.DeleteAccount(openid)) },
+                        onSelected = { openid -> viewModel.handleIntent(MainIntent.SetSelectedAccount(openid)) },
+                        onSwitchAndPlay = { openid -> viewModel.handleIntent(MainIntent.SwitchAndPlay(openid)) },
+                        onRestartApp = { viewModel.handleIntent(MainIntent.RestartApp) },
+                        onShowDetails = { account -> viewModel.handleIntent(MainIntent.ShowAccountDetails(account)) },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountListSection(
+    accounts: List<AccountUiModel>,
+    operationMode: OperationMode,
+    onDelete: (String) -> Unit,
+    onSelected: (String) -> Unit,
+    onSwitchAndPlay: (String) -> Unit,
+    onRestartApp: () -> Unit,
+    onShowDetails: (AccountUiModel) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(accounts, key = { it.openid }) { account ->
+            SwipeToRevealDelete(
+                onDelete = { onDelete(account.openid) }
+            ) {
+                AccountItem(
+                    account = account,
+                    onSelected = { onSelected(account.openid) },
+                    onPlay = {
+                        if (operationMode == OperationMode.SHIZUKU) {
+                            onRestartApp()
+                        } else {
+                            onSwitchAndPlay(account.openid)
+                        }
+                    },
+                    onShowDetails = { onShowDetails(account) }
+                )
             }
         }
     }
@@ -259,7 +360,7 @@ fun ModeChip(
     Surface(
         onClick = onClick,
         color = color.copy(alpha = if (isActive) 1f else 0.1f),
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = RectangleShape,
         border = if (isActive) null else androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.5f))
     ) {
         Row(
@@ -292,12 +393,12 @@ fun ToolPlaceholderSection(
     onImportFromFile: () -> Unit
 ) {
     val pagerState = rememberPagerState(initialPage = 0) { 2 }
-    val coroutineScope = rememberCoroutineScope()
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
+        shape = RectangleShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
@@ -306,24 +407,6 @@ fun ToolPlaceholderSection(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ToolPageChip(
-                    label = "基础工具",
-                    selected = pagerState.currentPage == 0,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
-                )
-                ToolPageChip(
-                    label = "文件导入导出",
-                    selected = pagerState.currentPage == 1,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -416,28 +499,25 @@ fun ToolPlaceholderSection(
             }
             
             Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = if (pagerState.currentPage == 0) "QQ 管理工具" else "账号文件导入导出",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.Gray
-            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(2) { index ->
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .size(if (pagerState.currentPage == index) 8.dp else 6.dp)
+                            .background(
+                                if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary else Color.Gray,
+                                CircleShape
+                            )
+                    )
+                }
+            }
         }
     }
-}
-
-@Composable
-private fun RowScope.ToolPageChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    FilterChip(
-        modifier = Modifier.weight(1f),
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) }
-    )
 }
 
 @Composable
