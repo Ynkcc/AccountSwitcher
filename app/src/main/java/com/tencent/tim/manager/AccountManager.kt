@@ -139,7 +139,7 @@ data class SaveResult(
     val error: String? = null
 )
 
-class AccountManager(private val context: Context) {
+class AccountManager(val context: Context) {
     companion object {
         private const val TAG = "AccountManager"
         private const val ENABLE_DIAGNOSTICS = false

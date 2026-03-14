@@ -17,6 +17,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,12 +30,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.activity.result.contract.ActivityResultContracts
 import com.tencent.tim.manager.AccountManager
 import com.tencent.tim.manager.AccountInfo
+import com.tencent.tim.manager.S3SyncManager
 import com.tencent.tim.service.FloatingService
 import com.tencent.tim.utils.ShellUtils
 import com.tencent.tim.ui.theme.GSwitcherTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var accountManager: AccountManager
+    private lateinit var s3SyncManager: S3SyncManager
 
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -46,6 +50,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         accountManager = AccountManager(this)
+        s3SyncManager = S3SyncManager(this, accountManager)
         
         if (!ShellUtils.checkRoot()) {
             Toast.makeText(this, "需要 Root 权限", Toast.LENGTH_LONG).show()
@@ -64,7 +69,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             GSwitcherTheme {
-                AccountListScreen(accountManager)
+                AccountListScreen(accountManager, s3SyncManager)
             }
         }
     }
@@ -73,10 +78,15 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountListScreen(accountManager: AccountManager) {
+fun AccountListScreen(accountManager: AccountManager, s3SyncManager: S3SyncManager) {
     var accounts by remember { mutableStateOf(accountManager.listAccounts()) }
     var showDecrypted by remember { mutableStateOf<String?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var showS3Settings by remember { mutableStateOf(false) }
+    var syncStatus by remember { mutableStateOf<String?>(null) }
+    var showSyncConflict by remember { mutableStateOf<Triple<String, String, (Boolean) -> Unit>?>(null) }
+
+    val scope = rememberCoroutineScope()
 
     // Use Lifecycle listener to refresh on resume
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -95,6 +105,29 @@ fun AccountListScreen(accountManager: AccountManager) {
             TopAppBar(
                 title = { Text("GSwitcher 账号管理") },
                 actions = {
+                    IconButton(onClick = {
+                        syncStatus = "正在同步..."
+                        s3SyncManager.syncAll(object : S3SyncManager.SyncCallback {
+                            override fun onConflict(openid: String, localToken: String, cloudToken: String, onChoice: (Boolean) -> Unit) {
+                                showSyncConflict = Triple(openid, "本地: $localToken\n云端: $cloudToken", onChoice)
+                            }
+                            override fun onProgress(message: String) {
+                                syncStatus = message
+                            }
+                            override fun onFinished(success: Boolean, message: String) {
+                                syncStatus = null
+                                accounts = accountManager.listAccounts()
+                                scope.launch(Dispatchers.Main) {
+                                    Toast.makeText(accountManager.context, message, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        })
+                    }) {
+                        Icon(Icons.Default.Sync, contentDescription = "S3 同步")
+                    }
+                    IconButton(onClick = { showS3Settings = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "S3 设置")
+                    }
                     IconButton(onClick = { accounts = accountManager.listAccounts() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "刷新列表")
                     }
@@ -144,6 +177,83 @@ fun AccountListScreen(accountManager: AccountManager) {
                 }
             }
         }
+    }
+
+    if (showS3Settings) {
+        val currentConfig = s3SyncManager.getConfig() ?: S3SyncManager.S3Config("", "", "", "", "us-east-1")
+        var endpoint by remember { mutableStateOf(currentConfig.endpoint) }
+        var bucket by remember { mutableStateOf(currentConfig.bucket) }
+        var accessKey by remember { mutableStateOf(currentConfig.accessKey) }
+        var secretKey by remember { mutableStateOf(currentConfig.secretKey) }
+        var region by remember { mutableStateOf(currentConfig.region) }
+
+        Dialog(onDismissRequest = { showS3Settings = false }) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+                    Text("S3 配置", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(value = endpoint, onValueChange = { endpoint = it }, label = { Text("Endpoint") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(value = bucket, onValueChange = { bucket = it }, label = { Text("Bucket") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(value = accessKey, onValueChange = { accessKey = it }, label = { Text("Access Key") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(value = secretKey, onValueChange = { secretKey = it }, label = { Text("Secret Key") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(value = region, onValueChange = { region = it }, label = { Text("Region") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showS3Settings = false }) { Text("取消") }
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = {
+                            s3SyncManager.saveConfig(S3SyncManager.S3Config(endpoint, bucket, accessKey, secretKey, region))
+                            showS3Settings = false
+                        }) { Text("保存") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (syncStatus != null) {
+        Dialog(onDismissRequest = { }) {
+            Surface(
+                modifier = Modifier.padding(16.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Row(modifier = Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.width(16.dp))
+                    Text(syncStatus!!)
+                }
+            }
+        }
+    }
+
+    if (showSyncConflict != null) {
+        val (openid, details, callback) = showSyncConflict!!
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("同步冲突: $openid") },
+            text = { Text("本地和云端数据不一致，请选择要保留的版本：\n\n$details") },
+            confirmButton = {
+                Button(onClick = {
+                    callback(true)
+                    showSyncConflict = null
+                }) { Text("使用云端") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    callback(false)
+                    showSyncConflict = null
+                }) { Text("使用本地") }
+            }
+        )
     }
 }
 
