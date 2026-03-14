@@ -191,14 +191,17 @@ class FloatingService : Service() {
             
             val responseJson = JSONObject().apply {
                 put("access_token", channelInfo.optString("access_token"))
-                put("openid", accountJson.optString("openid"))
-                put("pay_token", channelInfo.optString("pay_token"))
+                put("openid", accountJson.optString("openid", "default_openid"))
+                put("pay_token", channelInfo.optString("pay_token", "default_pay_token"))
+                put("expires_in", channelInfo.optString("expired", "7776000"))
                 put("ret", 0) // 必须为 0，表示成功
                 put("pf", accountJson.optString("pf"))
                 put("page_type", "1")
             }
             
-            AgentActivity.sendResponse(responseJson.toString())
+            val responseStr = responseJson.toString()
+            Log.d("FloatingService", "Response JSON: $responseStr")
+            AgentActivity.sendResponse(responseStr)
             Toast.makeText(this, "响应成功", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Log.e("FloatingService", "Build response failed", e)
