@@ -5,7 +5,18 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AccountDao {
-    @Query("SELECT * FROM accounts ORDER BY lastUpdateTs DESC")
+    @Query(
+        """
+        SELECT * FROM accounts
+        ORDER BY
+            CASE
+                WHEN lastLogoutTs <= 0 THEN 0
+                WHEN lastLogoutTs >= 1000000000000 THEN lastLogoutTs
+                ELSE lastLogoutTs * 1000
+            END DESC,
+            lastUpdateTs DESC
+        """
+    )
     fun getAllAccounts(): Flow<List<AccountEntity>>
 
     @Query("SELECT * FROM accounts WHERE openid = :openid LIMIT 1")

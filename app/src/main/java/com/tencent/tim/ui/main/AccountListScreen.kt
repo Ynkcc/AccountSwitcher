@@ -456,7 +456,8 @@ fun ToolPlaceholderSection(
                                     .weight(1f)
                                     .fillMaxHeight(),
                                 onClick = onManualImport,
-                                enabled = enabled
+                                enabled = enabled,
+                                shape = RectangleShape
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -475,7 +476,8 @@ fun ToolPlaceholderSection(
                                     .weight(1f)
                                     .fillMaxHeight(),
                                 onClick = onExportToFile,
-                                enabled = enabled
+                                enabled = enabled,
+                                shape = RectangleShape
                             ) {
                                 Icon(Icons.Default.ArrowUpward, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -487,7 +489,8 @@ fun ToolPlaceholderSection(
                                     .weight(1f)
                                     .fillMaxHeight(),
                                 onClick = onImportFromFile,
-                                enabled = enabled
+                                enabled = enabled,
+                                shape = RectangleShape
                             ) {
                                 Icon(Icons.Default.ArrowDownward, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
