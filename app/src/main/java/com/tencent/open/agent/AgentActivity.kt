@@ -32,6 +32,7 @@ class AgentActivity : Activity() {
         instance = this
         
         // 打印请求参数
+        @Suppress("DEPRECATION")
         Log.d(TAG, "AgentActivity started with intent: ${intent?.extras?.let { extras -> 
             extras.keySet().joinToString("; ") { key -> "$key=${extras.get(key)}" }
         } ?: "No extras"}")
