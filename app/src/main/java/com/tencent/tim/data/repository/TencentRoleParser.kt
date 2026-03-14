@@ -39,7 +39,7 @@ object TencentRoleParser {
                 heatValue = params["reli"] ?: "0",
                 rank = getRank(params["tppseasonduorating"] ?: "0"),
                 rankPoints = params["tppseasonduorating"] ?: "0",
-                lastLogout = params["lastlogouttime"] ?: "未知"
+                lastLogoutTs = params["lastlogouttime"]?.toLongOrNull() ?: 0L
             )
         } catch (e: Exception) {
             Log.e(TAG, "Exception during parsing role info", e)

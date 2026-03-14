@@ -20,7 +20,7 @@ data class AccountEntity(
     var heatValue: String = "0",
     var rank: String = "未知",
     var rankPoints: String = "0",
-    var lastLogout: String = "未知",
+    var lastLogoutTs: Long = 0,
     var lastUpdateTs: Long = System.currentTimeMillis(),
 
     // itop_login.txt Reconstruction Fields

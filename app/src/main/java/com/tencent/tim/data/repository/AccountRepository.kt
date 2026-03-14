@@ -121,7 +121,7 @@ class AccountRepository(
         target.heatValue = remoteInfo.heatValue
         target.rank = remoteInfo.rank
         target.rankPoints = remoteInfo.rankPoints
-        target.lastLogout = remoteInfo.lastLogout
+        target.lastLogoutTs = remoteInfo.lastLogoutTs
     }
 
     suspend fun setSelectedAccount(openid: String) {

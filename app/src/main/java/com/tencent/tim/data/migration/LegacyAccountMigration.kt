@@ -47,8 +47,7 @@ private data class LegacyInfoJson(
     val aceMark: String = "0",
     val heatValue: String = "0",
     val rank: String = "未知",
-    val rankPoints: String = "0",
-    val lastLogout: String = "未知"
+    val rankPoints: String = "0"
 )
 
 class LegacyAccountMigration(
@@ -126,7 +125,6 @@ class LegacyAccountMigration(
             heatValue = info?.heatValue ?: "0",
             rank = info?.rank ?: "未知",
             rankPoints = info?.rankPoints ?: "0",
-            lastLogout = info?.lastLogout ?: "未知",
             accessToken = channelInfo?.access_token ?: "",
             payToken = channelInfo?.pay_token ?: "",
             expired = channelInfo?.expired ?: 0,

@@ -2,8 +2,9 @@ package com.tencent.tim.ui.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tencent.tim.data.local.AccountEntity
 import com.tencent.tim.domain.AccountInteractor
+import com.tencent.tim.ui.model.AccountUiModel
+import com.tencent.tim.ui.model.toUiModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -46,7 +47,7 @@ class MainViewModel(
         }
     }
 
-    private fun showAccountDetails(account: AccountEntity) {
+    private fun showAccountDetails(account: AccountUiModel) {
         viewModelScope.launch {
             _effect.emit(MainEffect.ShowAccountDetails(account))
         }
@@ -71,7 +72,12 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             interactor.allAccounts.collect { accounts ->
-                _state.update { it.copy(accounts = accounts, isLoading = false) }
+                _state.update {
+                    it.copy(
+                        accounts = accounts.map { account -> account.toUiModel() },
+                        isLoading = false
+                    )
+                }
             }
         }
     }

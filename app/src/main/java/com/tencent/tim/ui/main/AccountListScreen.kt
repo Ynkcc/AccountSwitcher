@@ -24,8 +24,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.tencent.tim.data.local.AccountEntity
 import com.tencent.tim.ui.common.AccountItem
+import com.tencent.tim.ui.model.AccountUiModel
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
@@ -39,7 +39,7 @@ fun AccountListScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    var showDetailsAccount by remember { mutableStateOf<AccountEntity?>(null) }
+    var showDetailsAccount by remember { mutableStateOf<AccountUiModel?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.effect.collectLatest { effect ->
@@ -75,31 +75,72 @@ fun AccountListScreen(
             )
         }
     ) { padding ->
-        if (state.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
-
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(padding)
         ) {
-            items(state.accounts, key = { it.openid }) { account ->
-                SwipeToRevealDelete(
-                    onDelete = { viewModel.handleIntent(MainIntent.DeleteAccount(account.openid)) }
-                ) {
-                    AccountItem(
-                        account = account,
-                        onSelected = { viewModel.handleIntent(MainIntent.SetSelectedAccount(account.openid)) },
-                        onPlay = { viewModel.handleIntent(MainIntent.SwitchAndPlay(account.openid)) },
-                        onShowDetails = { viewModel.handleIntent(MainIntent.ShowAccountDetails(account)) }
-                    )
+            // 工具占位区域
+            ToolPlaceholderSection()
+
+            if (state.isLoading) {
+                Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
             }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(state.accounts, key = { it.openid }) { account ->
+                    SwipeToRevealDelete(
+                        onDelete = { viewModel.handleIntent(MainIntent.DeleteAccount(account.openid)) }
+                    ) {
+                        AccountItem(
+                            account = account,
+                            onSelected = { viewModel.handleIntent(MainIntent.SetSelectedAccount(account.openid)) },
+                            onPlay = { viewModel.handleIntent(MainIntent.SwitchAndPlay(account.openid)) },
+                            onShowDetails = { viewModel.handleIntent(MainIntent.ShowAccountDetails(account)) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ToolPlaceholderSection() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Default.Build,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "工具箱 (占位符)",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = "未来将在此处添加更多功能组件",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
         }
     }
 }
@@ -170,7 +211,7 @@ fun SwipeToRevealDelete(
 
 @Composable
 fun AccountDetailsDialog(
-    account: AccountEntity,
+    account: AccountUiModel,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -185,7 +226,7 @@ fun AccountDetailsDialog(
                 DetailRow("Online", account.isOnline)
                 DetailRow("Ban Status", account.isBan)
                 DetailRow("Heat Value", account.heatValue)
-                DetailRow("Last Update", account.lastLogout)
+                DetailRow("Last Logout", account.lastLogoutText)
             }
         },
         confirmButton = {

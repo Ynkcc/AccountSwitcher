@@ -10,11 +10,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.tencent.tim.data.local.AccountEntity
+import com.tencent.tim.ui.model.AccountUiModel
 
 @Composable
 fun AccountItem(
-    account: AccountEntity,
+    account: AccountUiModel,
     onSelected: () -> Unit,
     onPlay: () -> Unit,
     onShowDetails: () -> Unit,
@@ -39,7 +39,7 @@ fun AccountItem(
             Column(modifier = Modifier.weight(1f).padding(horizontal = 8.dp)) {
                 Text(text = account.roleName, style = MaterialTheme.typography.titleMedium)
                 Text(text = "lv.${account.level} - ${account.rank}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                Text(text = "下线时间: ${account.lastLogout}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(text = "下线时间: ${account.lastLogoutText}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
             
             IconButton(onClick = onPlay) {
