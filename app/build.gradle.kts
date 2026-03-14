@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,30 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
+
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localFile.inputStream().use { input ->
+            load(input)
+        }
+    }
+}
+
+val releaseStoreFilePath =
+    localProperties.getProperty("release.storeFile")
+        ?: "/home/ynk/Desktop/qy/sign/Ynkcc.jks"
+val releaseStorePassword =
+    System.getenv("RELEASE_STORE_PASSWORD")
+        ?: localProperties.getProperty("release.storePassword")
+        ?: (project.findProperty("RELEASE_STORE_PASSWORD") as String?)
+val releaseKeyAlias =
+    localProperties.getProperty("release.keyAlias")
+        ?: "key0"
+val releaseKeyPassword =
+    System.getenv("RELEASE_KEY_PASSWORD")
+        ?: localProperties.getProperty("release.keyPassword")
+        ?: (project.findProperty("RELEASE_KEY_PASSWORD") as String?)
 
 android {
     namespace = "com.tencent.tim"
@@ -20,9 +46,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(releaseStoreFilePath)
+            storePassword = releaseStorePassword
+            keyAlias = releaseKeyAlias
+            keyPassword = releaseKeyPassword
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
