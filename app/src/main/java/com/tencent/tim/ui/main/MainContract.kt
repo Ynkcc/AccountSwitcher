@@ -1,11 +1,15 @@
 package com.tencent.tim.ui.main
 
+import com.tencent.tim.manager.OperationMode
 import com.tencent.tim.ui.model.AccountUiModel
 
 data class MainState(
     val accounts: List<AccountUiModel> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val operationMode: OperationMode = OperationMode.NONE,
+    val isShizukuAvailable: Boolean = false,
+    val isRootAvailable: Boolean = false
 )
 
 sealed class MainIntent {
@@ -19,6 +23,10 @@ sealed class MainIntent {
     object ClearCurrentAccount : MainIntent()
     object RefreshAccountsOnlineInfo : MainIntent()
     object RestartApp : MainIntent()
+    object HideQQ : MainIntent()
+    object RestoreQQ : MainIntent()
+    object RequestShizukuPermission : MainIntent()
+    object CheckModes : MainIntent()
 }
 
 sealed class MainEffect {

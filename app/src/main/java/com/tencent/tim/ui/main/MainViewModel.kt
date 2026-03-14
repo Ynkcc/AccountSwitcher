@@ -3,17 +3,23 @@ package com.tencent.tim.ui.main
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tencent.tim.domain.AccountInteractor
+import com.tencent.tim.manager.ModeManager
+import com.tencent.tim.manager.OperationMode
+import com.tencent.tim.manager.QQControlManager
 import com.tencent.tim.ui.model.AccountUiModel
 import com.tencent.tim.ui.model.toUiModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class MainViewModel(
-    private val interactor: AccountInteractor
+    private val interactor: AccountInteractor,
+    private val modeManager: ModeManager,
+    private val qqControlManager: QQControlManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(MainState())
@@ -24,6 +30,21 @@ class MainViewModel(
 
     init {
         handleIntent(MainIntent.LoadAccounts)
+        handleIntent(MainIntent.CheckModes)
+        
+        // 启动时请求 Shizuku 授权 (如果 Shizuku 已启动但未授权)
+        viewModelScope.launch {
+            if (modeManager.isShizukuAlive() && !modeManager.isShizukuAvailable()) {
+                modeManager.requestShizukuPermission()
+            }
+        }
+
+        // 监听模式变化
+        viewModelScope.launch {
+            modeManager.currentMode.collectLatest { mode ->
+                _state.update { it.copy(operationMode = mode) }
+            }
+        }
     }
 
     fun handleIntent(intent: MainIntent) {
@@ -38,6 +59,50 @@ class MainViewModel(
             is MainIntent.ClearCurrentAccount -> clearAccount()
             is MainIntent.RefreshAccountsOnlineInfo -> refreshAccountsOnlineInfo()
             is MainIntent.RestartApp -> restartApp()
+            is MainIntent.HideQQ -> hideQQ()
+            is MainIntent.RestoreQQ -> restoreQQ()
+            is MainIntent.RequestShizukuPermission -> requestShizukuPermission()
+            is MainIntent.CheckModes -> checkModes()
+        }
+    }
+
+    private fun checkModes() {
+        viewModelScope.launch {
+            modeManager.checkAvailability()
+            _state.update {
+                it.copy(
+                    isRootAvailable = modeManager.isRootAvailable(),
+                    isShizukuAvailable = modeManager.isShizukuAvailable()
+                )
+            }
+        }
+    }
+
+    private fun requestShizukuPermission() {
+        viewModelScope.launch {
+            modeManager.requestShizukuPermission()
+            // 重新检查模式
+            checkModes()
+        }
+    }
+
+    private fun hideQQ() {
+        viewModelScope.launch {
+            if (qqControlManager.hideQQ()) {
+                _effect.emit(MainEffect.ShowToast("QQ 已隐藏"))
+            } else {
+                _effect.emit(MainEffect.ShowToast("隐藏失败，请检查授权"))
+            }
+        }
+    }
+
+    private fun restoreQQ() {
+        viewModelScope.launch {
+            if (qqControlManager.unhideQQ()) {
+                _effect.emit(MainEffect.ShowToast("QQ 已恢复"))
+            } else {
+                _effect.emit(MainEffect.ShowToast("恢复失败，请检查授权"))
+            }
         }
     }
 

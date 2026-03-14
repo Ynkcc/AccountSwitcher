@@ -172,6 +172,14 @@ class RootManager {
         return result
     }
 
+    fun hideApp(packageName: String): Boolean {
+        return execRoot("pm hide $packageName")
+    }
+
+    fun unhideApp(packageName: String): Boolean {
+        return execRoot("pm unhide $packageName")
+    }
+
     fun deleteFileSync(path: String): Boolean {
         return deleteFile(path)
     }
