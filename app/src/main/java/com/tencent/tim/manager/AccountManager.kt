@@ -24,9 +24,7 @@ data class AccountInfo(
     val heatValue: String = "0",
     val rank: String = "未知",
     val rankPoints: String = "0",
-    val lastLogout: String = "未知",
-    val totalRecharge: String = "0",
-    val todayLogin: String = "0"
+    val lastLogout: String = "未知"
 )
 
 data class ChannelInfo(
@@ -278,9 +276,7 @@ class AccountManager(val context: Context) {
                         heatValue = params["reli"] ?: "0",
                         rank = getRank(params["tppseasonduorating"] ?: "0"),
                         rankPoints = params["tppseasonduorating"] ?: "0",
-                        lastLogout = lastLogoutFormatted,
-                        totalRecharge = params["accumulatechargenum"] ?: "0",
-                        todayLogin = params["logintoday"] ?: "0"
+                        lastLogout = lastLogoutFormatted
                     )
                 } else {
                     Log.e(TAG, "Sync failed with code: $responseCode")
@@ -306,8 +302,6 @@ class AccountManager(val context: Context) {
             put("rank", info.rank)
             put("rankPoints", info.rankPoints)
             put("lastLogout", info.lastLogout)
-            put("totalRecharge", info.totalRecharge)
-            put("todayLogin", info.todayLogin)
         }
         infoFile.writeText(json.toString())
     }
@@ -328,9 +322,7 @@ class AccountManager(val context: Context) {
                 heatValue = json.optString("heatValue", "0"),
                 rank = json.optString("rank", "未知"),
                 rankPoints = json.optString("rankPoints", "0"),
-                lastLogout = json.optString("lastLogout", "未知"),
-                totalRecharge = json.optString("totalRecharge", "0"),
-                todayLogin = json.optString("todayLogin", "0")
+                lastLogout = json.optString("lastLogout", "未知")
             )
         } catch (e: Exception) {
             null
