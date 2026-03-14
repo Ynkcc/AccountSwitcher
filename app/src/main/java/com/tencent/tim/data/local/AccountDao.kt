@@ -19,4 +19,19 @@ interface AccountDao {
 
     @Query("DELETE FROM accounts WHERE openid = :openid")
     suspend fun deleteAccountByOpenid(openid: String)
+
+    @Query("UPDATE accounts SET isSelected = 0")
+    suspend fun clearAllSelected()
+
+    @Transaction
+    suspend fun setSelectedAccount(openid: String) {
+        clearAllSelected()
+        updateSelected(openid, true)
+    }
+
+    @Query("UPDATE accounts SET isSelected = :selected WHERE openid = :openid")
+    suspend fun updateSelected(openid: String, selected: Boolean)
+
+    @Query("SELECT * FROM accounts WHERE isSelected = 1 LIMIT 1")
+    suspend fun getSelectedAccount(): AccountEntity?
 }

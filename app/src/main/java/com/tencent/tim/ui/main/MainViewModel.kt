@@ -2,6 +2,7 @@ package com.tencent.tim.ui.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tencent.tim.data.local.AccountEntity
 import com.tencent.tim.domain.AccountInteractor
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,10 +29,41 @@ class MainViewModel(
         when (intent) {
             is MainIntent.LoadAccounts -> loadAccounts()
             is MainIntent.SaveCurrentAccount -> saveAccount()
-            is MainIntent.SwitchAccount -> switchAccount(intent.openid)
+            is MainIntent.SetSelectedAccount -> setSelectedAccount(intent.openid)
+            is MainIntent.ShowAccountDetails -> showAccountDetails(intent.account)
+            is MainIntent.SwitchAndPlay -> switchAndPlay(intent.openid)
+            is MainIntent.SwitchAccount -> switchAndPlay(intent.openid)
             is MainIntent.DeleteAccount -> deleteAccount(intent.openid)
             is MainIntent.ClearCurrentAccount -> clearAccount()
+            is MainIntent.RefreshAccountsOnlineInfo -> refreshAccountsOnlineInfo()
             is MainIntent.RestartApp -> restartApp()
+        }
+    }
+
+    private fun setSelectedAccount(openid: String) {
+        viewModelScope.launch {
+            interactor.setSelectedAccount(openid)
+        }
+    }
+
+    private fun showAccountDetails(account: AccountEntity) {
+        viewModelScope.launch {
+            _effect.emit(MainEffect.ShowAccountDetails(account))
+        }
+    }
+
+    private fun switchAndPlay(openid: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            interactor.switchAccount(openid)
+                .onSuccess {
+                    _effect.emit(MainEffect.ShowToast("切换成功，正在重启游戏..."))
+                    interactor.restartApp()
+                }
+                .onFailure { error ->
+                    _effect.emit(MainEffect.ShowToast("切换失败: ${error.message}"))
+                }
+            _state.update { it.copy(isLoading = false) }
         }
     }
 
@@ -58,21 +90,6 @@ class MainViewModel(
         }
     }
 
-    private fun switchAccount(openid: String) {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
-            interactor.switchAccount(openid)
-                .onSuccess {
-                    _effect.emit(MainEffect.ShowToast("切换成功，正在重启游戏..."))
-                    interactor.restartApp()
-                }
-                .onFailure { error ->
-                    _effect.emit(MainEffect.ShowToast("切换失败: ${error.message}"))
-                }
-            _state.update { it.copy(isLoading = false) }
-        }
-    }
-
     private fun deleteAccount(openid: String) {
         viewModelScope.launch {
             interactor.deleteAccount(openid)
@@ -94,6 +111,25 @@ class MainViewModel(
     private fun restartApp() {
         viewModelScope.launch {
             interactor.restartApp()
+        }
+    }
+
+    private fun refreshAccountsOnlineInfo() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            interactor.refreshAccountsOnlineInfo()
+                .onSuccess { (refreshedCount, totalCount) ->
+                    val message = if (totalCount == 0) {
+                        "暂无可刷新的账号"
+                    } else {
+                        "在线信息刷新完成：$refreshedCount/$totalCount"
+                    }
+                    _effect.emit(MainEffect.ShowToast(message))
+                }
+                .onFailure { error ->
+                    _effect.emit(MainEffect.ShowToast("在线信息刷新失败: ${error.message}"))
+                }
+            _state.update { it.copy(isLoading = false) }
         }
     }
 }

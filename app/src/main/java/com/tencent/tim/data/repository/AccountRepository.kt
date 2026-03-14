@@ -7,6 +7,7 @@ import com.tencent.tim.data.remote.TencentGameApi
 import com.tencent.tim.data.system.RootManager
 import com.tencent.tim.utils.MSDKTea
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -31,18 +32,8 @@ class AccountRepository(
             val accessToken = entity.accessToken
             if (accessToken.isNotEmpty()) {
                 fetchRemoteRoleInfo(entity.openid, accessToken)?.let { remoteInfo ->
-                    // Update entity with remote info
-                    entity.roleName = remoteInfo.roleName
-                    entity.roleId = remoteInfo.roleId
-                    entity.level = remoteInfo.level
-                    entity.isOnline = remoteInfo.isOnline
-                    entity.isBan = remoteInfo.isBan
-                    entity.isFace = remoteInfo.isFace
-                    entity.aceMark = remoteInfo.aceMark
-                    entity.heatValue = remoteInfo.heatValue
-                    entity.rank = remoteInfo.rank
-                    entity.rankPoints = remoteInfo.rankPoints
-                    entity.lastLogout = remoteInfo.lastLogout
+                    applyRemoteInfo(entity, remoteInfo)
+                    entity.lastUpdateTs = System.currentTimeMillis()
                 }
             }
             accountDao.insertAccount(entity)
@@ -71,6 +62,28 @@ class AccountRepository(
         }
     }
 
+    suspend fun refreshAccountsOnlineInfo(): Result<Pair<Int, Int>> = runCatching {
+        val accounts = allAccounts.first()
+        if (accounts.isEmpty()) {
+            return@runCatching 0 to 0
+        }
+
+        var refreshedCount = 0
+        accounts.forEach { account ->
+            if (account.accessToken.isBlank()) {
+                return@forEach
+            }
+
+            val remoteInfo = fetchRemoteRoleInfo(account.openid, account.accessToken) ?: return@forEach
+            applyRemoteInfo(account, remoteInfo)
+            account.lastUpdateTs = System.currentTimeMillis()
+            accountDao.insertAccount(account)
+            refreshedCount++
+        }
+
+        refreshedCount to accounts.size
+    }
+
     private suspend fun fetchRemoteRoleInfo(openid: String, accessToken: String): AccountEntity? {
         return try {
             val response = api.getRoleInfo(cookie = "acctype=qc; openid=$openid; access_token=$accessToken; appid=1106467070")
@@ -95,5 +108,27 @@ class AccountRepository(
 
     suspend fun clearCurrentAccount(): Boolean {
         return fileDataSource.clearAccount()
+    }
+
+    private fun applyRemoteInfo(target: AccountEntity, remoteInfo: AccountEntity) {
+        target.roleName = remoteInfo.roleName
+        target.roleId = remoteInfo.roleId
+        target.level = remoteInfo.level
+        target.isOnline = remoteInfo.isOnline
+        target.isBan = remoteInfo.isBan
+        target.isFace = remoteInfo.isFace
+        target.aceMark = remoteInfo.aceMark
+        target.heatValue = remoteInfo.heatValue
+        target.rank = remoteInfo.rank
+        target.rankPoints = remoteInfo.rankPoints
+        target.lastLogout = remoteInfo.lastLogout
+    }
+
+    suspend fun setSelectedAccount(openid: String) {
+        accountDao.setSelectedAccount(openid)
+    }
+
+    suspend fun getSelectedAccount(): AccountEntity? {
+        return accountDao.getSelectedAccount()
     }
 }

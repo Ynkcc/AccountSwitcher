@@ -38,5 +38,6 @@ data class AccountEntity(
     var gender: Int = 0,
     var birthdate: String = "",
     var pictureUrl: String = "",
-    var userName: String = ""
+    var userName: String = "",
+    var isSelected: Boolean = false
 )

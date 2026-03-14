@@ -14,10 +14,16 @@ class AccountInteractor(
     suspend fun switchAccount(openid: String) = repository.switchAccount(openid)
     
     suspend fun clearCurrentAccount() = repository.clearCurrentAccount()
+
+    suspend fun refreshAccountsOnlineInfo() = repository.refreshAccountsOnlineInfo()
     
     suspend fun restartApp() = repository.restartApp()
     
     suspend fun deleteAccount(openid: String) = repository.deleteAccount(openid)
     
     suspend fun buildAgentResponse(openid: String) = repository.buildAgentResponse(openid)
+
+    suspend fun setSelectedAccount(openid: String) = repository.setSelectedAccount(openid)
+
+    suspend fun getSelectedAccount() = repository.getSelectedAccount()
 }

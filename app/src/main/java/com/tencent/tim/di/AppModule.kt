@@ -8,7 +8,6 @@ import com.tencent.tim.data.repository.AccountFileDataSource
 import com.tencent.tim.data.repository.AccountRepository
 import com.tencent.tim.data.system.RootManager
 import com.tencent.tim.domain.AccountInteractor
-import com.tencent.tim.ui.floating.FloatingViewModel
 import com.tencent.tim.ui.main.MainViewModel
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -25,7 +24,9 @@ val appModule = module {
             androidContext(),
             AppDatabase::class.java,
             "gswitcher_db"
-        ).fallbackToDestructiveMigration(false).build()
+        ).addMigrations(AppDatabase.MIGRATION_1_2)
+            .fallbackToDestructiveMigration(false)
+            .build()
     }
     single { get<AppDatabase>().accountDao() }
     single { LegacyAccountMigration(androidContext(), get()) }
@@ -60,6 +61,5 @@ val appModule = module {
 
     // ViewModels
     viewModel { MainViewModel(get()) }
-    viewModel { FloatingViewModel(get()) }
 }
 

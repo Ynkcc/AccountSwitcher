@@ -4,48 +4,56 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import org.json.JSONObject
+import android.widget.Toast
+import com.tencent.tim.domain.AccountInteractor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 
 /**
  * Mocking QQ SDK's AgentActivity to handle login requests.
  */
 class AgentActivity : Activity() {
 
+    private val interactor: AccountInteractor by inject()
+    private val scope = MainScope()
+
     companion object {
         private const val TAG = "AgentActivity"
-        private var instance: AgentActivity? = null
-
-        fun sendResponse(jsonResponse: String) {
-            instance?.let { activity ->
-                val intent = Intent()
-                intent.putExtra("key_response", jsonResponse)
-                activity.setResult(RESULT_OK, intent)
-                activity.finish()
-            }
-        }
-        
-        fun isActive(): Boolean = instance != null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        instance = this
         
-        // 打印请求参数
-        @Suppress("DEPRECATION")
-        Log.d(TAG, "AgentActivity started with intent: ${intent?.extras?.let { extras -> 
-            extras.keySet().joinToString("; ") { key -> "$key=${extras.get(key)}" }
-        } ?: "No extras"}")
+        Log.d(TAG, "AgentActivity started with intent")
 
-        // Note: The UI for choosing the account will be handled by the FloatingService menu.
-        // This activity just stays in the background (or foreground with no UI) until 
-        // the user picks an account from the floating menu.
+        // 自动响应选中账号的登录请求
+        scope.launch {
+            val selectedAccount = interactor.getSelectedAccount()
+            if (selectedAccount != null) {
+                interactor.buildAgentResponse(selectedAccount.openid)
+                    .onSuccess { jsonResponse ->
+                        val intent = Intent()
+                        intent.putExtra("key_response", jsonResponse)
+                        setResult(RESULT_OK, intent)
+                        finish()
+                    }
+                    .onFailure { error ->
+                        Toast.makeText(this@AgentActivity, "构建登录响应失败: ${error.message}", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+            } else {
+                Toast.makeText(this@AgentActivity, "未选择登录账号，请在主页面先勾选一个", Toast.LENGTH_LONG).show()
+                finish()
+            }
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (instance == this) {
-            instance = null
-        }
+        scope.cancel()
     }
 }
