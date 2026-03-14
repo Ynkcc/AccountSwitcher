@@ -6,6 +6,7 @@ import com.tencent.tim.data.migration.LegacyAccountMigration
 import com.tencent.tim.data.remote.TencentGameApi
 import com.tencent.tim.data.repository.AccountFileDataSource
 import com.tencent.tim.data.repository.AccountRepository
+import com.tencent.tim.data.repository.AccountTransferFileDataSource
 import com.tencent.tim.data.system.RootManager
 import com.tencent.tim.domain.AccountInteractor
 import com.tencent.tim.manager.ModeManager
@@ -59,7 +60,8 @@ val appModule = module {
 
     // Repository
     single { AccountFileDataSource(get()) }
-    single { AccountRepository(get(), get(), get(), get()) }
+    single { AccountTransferFileDataSource(androidContext()) }
+    single { AccountRepository(get(), get(), get(), get(), get()) }
 
     // Domain
     single { AccountInteractor(get()) }

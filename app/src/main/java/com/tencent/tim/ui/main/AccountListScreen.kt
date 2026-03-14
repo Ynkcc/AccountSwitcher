@@ -1,5 +1,7 @@
 package com.tencent.tim.ui.main
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
@@ -16,6 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +36,7 @@ import com.tencent.tim.manager.OperationMode
 import com.tencent.tim.ui.common.AccountItem
 import com.tencent.tim.ui.model.AccountUiModel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
@@ -46,12 +51,30 @@ fun AccountListScreen(
     val context = LocalContext.current
     var showDetailsAccount by remember { mutableStateOf<AccountUiModel?>(null) }
     var showManualImportDialog by remember { mutableStateOf(false) }
+    val exportFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let {
+            viewModel.handleIntent(MainIntent.ExportAccountsToFile(it.toString()))
+        }
+    }
+    val importFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            viewModel.handleIntent(MainIntent.ImportAccountsFromFile(it.toString()))
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.effect.collectLatest { effect ->
             when (effect) {
                 is MainEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
                 is MainEffect.ShowAccountDetails -> showDetailsAccount = effect.account
+                is MainEffect.PickExportAccountsFile -> exportFileLauncher.launch(effect.suggestedFileName)
+                is MainEffect.PickImportAccountsFile -> importFileLauncher.launch(
+                    arrayOf("application/json", "text/plain", "application/octet-stream")
+                )
             }
         }
     }
@@ -129,9 +152,12 @@ fun AccountListScreen(
 
             // 工具占位区域
             ToolPlaceholderSection(
+                enabled = !state.isLoading,
                 onHideQQ = { viewModel.handleIntent(MainIntent.HideQQ) },
                 onRestoreQQ = { viewModel.handleIntent(MainIntent.RestoreQQ) },
-                onManualImport = { showManualImportDialog = true }
+                onManualImport = { showManualImportDialog = true },
+                onExportToFile = { viewModel.handleIntent(MainIntent.RequestExportAccountsToFile) },
+                onImportFromFile = { viewModel.handleIntent(MainIntent.RequestImportAccountsFromFile) }
             )
 
             if (state.isLoading) {
@@ -258,10 +284,16 @@ fun ModeChip(
 
 @Composable
 fun ToolPlaceholderSection(
+    enabled: Boolean,
     onHideQQ: () -> Unit,
     onRestoreQQ: () -> Unit,
-    onManualImport: () -> Unit
+    onManualImport: () -> Unit,
+    onExportToFile: () -> Unit,
+    onImportFromFile: () -> Unit
 ) {
+    val pagerState = rememberPagerState(initialPage = 0) { 2 }
+    val coroutineScope = rememberCoroutineScope()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -275,61 +307,137 @@ fun ToolPlaceholderSection(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ToolPageChip(
+                    label = "基础工具",
+                    selected = pagerState.currentPage == 0,
+                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
+                )
+                ToolPageChip(
+                    label = "文件导入导出",
+                    selected = pagerState.currentPage == 1,
+                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(112.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                userScrollEnabled = enabled
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        onClick = onHideQQ,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Icon(Icons.Default.VisibilityOff, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("隐藏QQ")
+                when (it) {
+                    0 -> {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    onClick = onHideQQ,
+                                    enabled = enabled,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Icon(Icons.Default.VisibilityOff, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("隐藏QQ")
+                                }
+
+                                Button(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    onClick = onRestoreQQ,
+                                    enabled = enabled,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Icon(Icons.Default.Visibility, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("恢复QQ")
+                                }
+                            }
+
+                            OutlinedButton(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                onClick = onManualImport,
+                                enabled = enabled
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("手动导入")
+                            }
+                        }
                     }
 
-                    Button(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        onClick = onRestoreQQ,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Icon(Icons.Default.Visibility, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("恢复QQ")
-                    }
-                }
+                    else -> {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                onClick = onExportToFile,
+                                enabled = enabled
+                            ) {
+                                Icon(Icons.Default.ArrowUpward, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("导出到文件")
+                            }
 
-                OutlinedButton(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    onClick = onManualImport
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("手动导入")
+                            OutlinedButton(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                onClick = onImportFromFile,
+                                enabled = enabled
+                            ) {
+                                Icon(Icons.Default.ArrowDownward, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("从文件中导入")
+                            }
+                        }
+                    }
                 }
             }
             
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = "QQ 管理工具",
+                text = if (pagerState.currentPage == 0) "QQ 管理工具" else "账号文件导入导出",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Gray
             )
         }
     }
+}
+
+@Composable
+private fun RowScope.ToolPageChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    FilterChip(
+        modifier = Modifier.weight(1f),
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) }
+    )
 }
 
 @Composable

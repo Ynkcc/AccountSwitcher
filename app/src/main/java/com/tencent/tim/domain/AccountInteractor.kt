@@ -32,4 +32,8 @@ class AccountInteractor(
         openid: String,
         payToken: String
     ) = repository.manualImportAccount(accessToken, openid, payToken)
+
+    suspend fun exportAccountsToFile(uriString: String) = repository.exportAccountsToFile(uriString)
+
+    suspend fun importAccountsFromFile(uriString: String) = repository.importAccountsFromFile(uriString)
 }

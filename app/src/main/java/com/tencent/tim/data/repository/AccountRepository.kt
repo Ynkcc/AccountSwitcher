@@ -5,20 +5,16 @@ import com.tencent.tim.data.local.AccountDao
 import com.tencent.tim.data.local.AccountEntity
 import com.tencent.tim.data.remote.TencentGameApi
 import com.tencent.tim.data.system.RootManager
-import com.tencent.tim.utils.MSDKTea
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.json.JSONObject
 
 class AccountRepository(
     private val accountDao: AccountDao,
     private val api: TencentGameApi,
     private val rootManager: RootManager,
-    private val fileDataSource: AccountFileDataSource
+    private val fileDataSource: AccountFileDataSource,
+    private val transferFileDataSource: AccountTransferFileDataSource
 ) {
     companion object {
         private const val TAG = "AccountRepository"
@@ -123,6 +119,60 @@ class AccountRepository(
         refreshedCount to accounts.size
     }
 
+    suspend fun exportAccountsToFile(uriString: String): Result<Int> = runCatching {
+        val accounts = allAccounts.first()
+        require(accounts.isNotEmpty()) { "暂无账号可导出" }
+
+        transferFileDataSource.exportToUri(
+            uriString = uriString,
+            payload = AccountTransferPayload(accounts = accounts)
+        ).getOrThrow()
+
+        accounts.size
+    }
+
+    suspend fun importAccountsFromFile(uriString: String): Result<AccountImportSummary> = runCatching {
+        val payload = transferFileDataSource.importFromUri(uriString).getOrThrow()
+        require(payload.accounts.isNotEmpty()) { "导入文件中没有账号数据" }
+
+        var insertedCount = 0
+        var updatedCount = 0
+        var skippedCount = 0
+        var invalidCount = 0
+
+        payload.accounts.forEach { rawAccount ->
+            val normalizedAccount = normalizeImportedAccount(rawAccount)
+            if (normalizedAccount == null) {
+                invalidCount++
+                return@forEach
+            }
+
+            val existing = accountDao.getAccountByOpenid(normalizedAccount.openid)
+            when {
+                existing == null -> {
+                    accountDao.insertAccount(normalizedAccount)
+                    insertedCount++
+                }
+
+                existing.accessToken != normalizedAccount.accessToken -> {
+                    accountDao.insertAccount(
+                        normalizedAccount.copy(isSelected = existing.isSelected)
+                    )
+                    updatedCount++
+                }
+
+                else -> skippedCount++
+            }
+        }
+
+        AccountImportSummary(
+            insertedCount = insertedCount,
+            updatedCount = updatedCount,
+            skippedCount = skippedCount,
+            invalidCount = invalidCount
+        )
+    }
+
     private suspend fun fetchRemoteRoleInfo(openid: String, accessToken: String): AccountEntity? {
         return try {
             val response = api.getRoleInfo(cookie = "acctype=qc; openid=$openid; access_token=$accessToken; appid=1106467070")
@@ -218,6 +268,43 @@ class AccountRepository(
 
     private fun buildDefaultPf(openid: String): String {
         return "qq_qq-10159208-android-10017385-qq-$QQ_GAME_APP_ID-$openid"
+    }
+
+    private fun normalizeImportedAccount(account: AccountEntity): AccountEntity? {
+        val openid = account.openid.trim()
+        val accessToken = account.accessToken.trim()
+        if (openid.isBlank() || accessToken.isBlank()) {
+            return null
+        }
+
+        val normalized = account.copy(
+            openid = openid,
+            roleName = account.roleName.ifBlank { openid },
+            uid = account.uid.ifBlank { openid },
+            isSelected = false,
+            lastUpdateTs = maxOf(account.lastUpdateTs, System.currentTimeMillis())
+        )
+
+        normalized.accessToken = accessToken
+        normalized.payToken = account.payToken.trim()
+        normalized.uid = normalized.uid.ifBlank { openid }
+        normalized.token = normalized.token.ifBlank { accessToken }
+        normalized.channel = normalized.channel.ifBlank { "QQ" }
+        normalized.channelId = if (normalized.channelId > 0) normalized.channelId else 2
+        normalized.pf = if (normalized.pf.isBlank()) {
+            buildDefaultPf(openid)
+        } else {
+            rewritePfOpenid(normalized.pf, openid)
+        }
+
+        if (normalized.expired <= 0) {
+            normalized.expired = 2_592_000
+        }
+        if (normalized.expireTs <= 0L) {
+            normalized.expireTs = (System.currentTimeMillis() / 1000) + normalized.expired
+        }
+
+        return normalized
     }
 
     suspend fun deleteAccount(openid: String) {

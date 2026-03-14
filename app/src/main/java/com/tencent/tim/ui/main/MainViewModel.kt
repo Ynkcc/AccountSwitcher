@@ -15,12 +15,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class MainViewModel(
     private val interactor: AccountInteractor,
     private val modeManager: ModeManager,
     private val qqControlManager: QQControlManager
 ) : ViewModel() {
+    companion object {
+        private val exportFileNameFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.getDefault())
+    }
+
 
     private val _state = MutableStateFlow(MainState())
     val state = _state.asStateFlow()
@@ -51,6 +58,10 @@ class MainViewModel(
         when (intent) {
             is MainIntent.LoadAccounts -> loadAccounts()
             is MainIntent.SaveCurrentAccount -> saveAccount()
+            is MainIntent.RequestExportAccountsToFile -> requestExportAccountsToFile()
+            is MainIntent.RequestImportAccountsFromFile -> requestImportAccountsFromFile()
+            is MainIntent.ExportAccountsToFile -> exportAccountsToFile(intent.uriString)
+            is MainIntent.ImportAccountsFromFile -> importAccountsFromFile(intent.uriString)
             is MainIntent.SetSelectedAccount -> setSelectedAccount(intent.openid)
             is MainIntent.ShowAccountDetails -> showAccountDetails(intent.account)
             is MainIntent.SwitchAndPlay -> switchAndPlay(intent.openid)
@@ -161,6 +172,58 @@ class MainViewModel(
                 }
                 .onFailure { error ->
                     _effect.emit(MainEffect.ShowToast("保存失败: ${error.message}"))
+                }
+            _state.update { it.copy(isLoading = false) }
+        }
+    }
+
+    private fun requestExportAccountsToFile() {
+        viewModelScope.launch {
+            if (_state.value.accounts.isEmpty()) {
+                _effect.emit(MainEffect.ShowToast("暂无账号可导出"))
+                return@launch
+            }
+
+            val fileName = "gswitcher_accounts_${LocalDateTime.now().format(exportFileNameFormatter)}.json"
+            _effect.emit(MainEffect.PickExportAccountsFile(fileName))
+        }
+    }
+
+    private fun requestImportAccountsFromFile() {
+        viewModelScope.launch {
+            _effect.emit(MainEffect.PickImportAccountsFile)
+        }
+    }
+
+    private fun exportAccountsToFile(uriString: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            interactor.exportAccountsToFile(uriString)
+                .onSuccess { count ->
+                    _effect.emit(MainEffect.ShowToast("成功导出 $count 个账号"))
+                }
+                .onFailure { error ->
+                    _effect.emit(MainEffect.ShowToast("导出失败: ${error.message}"))
+                }
+            _state.update { it.copy(isLoading = false) }
+        }
+    }
+
+    private fun importAccountsFromFile(uriString: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            interactor.importAccountsFromFile(uriString)
+                .onSuccess { summary ->
+                    val message = buildString {
+                        append("导入完成：新增 ${summary.insertedCount}，更新 ${summary.updatedCount}，跳过 ${summary.skippedCount}")
+                        if (summary.invalidCount > 0) {
+                            append("，无效 ${summary.invalidCount}")
+                        }
+                    }
+                    _effect.emit(MainEffect.ShowToast(message))
+                }
+                .onFailure { error ->
+                    _effect.emit(MainEffect.ShowToast("导入失败: ${error.message}"))
                 }
             _state.update { it.copy(isLoading = false) }
         }

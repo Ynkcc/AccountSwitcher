@@ -15,6 +15,10 @@ data class MainState(
 sealed class MainIntent {
     object LoadAccounts : MainIntent()
     object SaveCurrentAccount : MainIntent()
+    object RequestExportAccountsToFile : MainIntent()
+    object RequestImportAccountsFromFile : MainIntent()
+    data class ExportAccountsToFile(val uriString: String) : MainIntent()
+    data class ImportAccountsFromFile(val uriString: String) : MainIntent()
     data class SetSelectedAccount(val openid: String) : MainIntent()
     data class ShowAccountDetails(val account: AccountUiModel) : MainIntent()
     data class SwitchAndPlay(val openid: String) : MainIntent()
@@ -37,4 +41,6 @@ sealed class MainIntent {
 sealed class MainEffect {
     data class ShowToast(val message: String) : MainEffect()
     data class ShowAccountDetails(val account: AccountUiModel) : MainEffect()
+    data class PickExportAccountsFile(val suggestedFileName: String) : MainEffect()
+    object PickImportAccountsFile : MainEffect()
 }
