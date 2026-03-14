@@ -100,7 +100,7 @@ class FloatingService : Service() {
     }
 
     private fun showMenuDialog() {
-        val items = arrayOf("保存当前账号", "切换账号", "清除当前登录", "选择响应帐号")
+        val items = arrayOf("保存当前账号", "切换账号", "清除当前登录", "选择响应帐号", "重启应用")
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle("GSwitcher")
             .setItems(items) { _, which ->
@@ -109,6 +109,7 @@ class FloatingService : Service() {
                     1 -> showAccountList()
                     2 -> clearCurrent()
                     3 -> showAccountListForResponse()
+                    4 -> manualRestart()
                 }
             }
             .create().apply {
@@ -164,7 +165,8 @@ class FloatingService : Service() {
                     handleResponse(openid)
                 } else {
                     if (accountManager.switchAccount(openid)) {
-                        Toast.makeText(this, "已切换到 $displayName，请重启游戏", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "已切换到 $displayName，正在重启游戏...", Toast.LENGTH_LONG).show()
+                        kotlin.concurrent.thread { accountManager.restartApp() }
                     } else {
                         Toast.makeText(this, "切换失败", Toast.LENGTH_SHORT).show()
                     }
@@ -230,10 +232,16 @@ class FloatingService : Service() {
 
     private fun clearCurrent() {
         if (accountManager.clearCurrentAccount()) {
-            Toast.makeText(this, "已清除登录，请重启游戏", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "已清除登录，正在重启游戏...", Toast.LENGTH_LONG).show()
+            kotlin.concurrent.thread { accountManager.restartApp() }
         } else {
             Toast.makeText(this, "清除失败", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun manualRestart() {
+        Toast.makeText(this, "正在重启游戏...", Toast.LENGTH_SHORT).show()
+        kotlin.concurrent.thread { accountManager.restartApp() }
     }
 
     private fun createNotificationChannel() {

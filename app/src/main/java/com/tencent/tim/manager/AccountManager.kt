@@ -434,6 +434,11 @@ class AccountManager(private val context: Context) {
         return ShellUtils.execRoot(command)
     }
 
+    fun restartApp(): Boolean {
+        val command = "am force-stop $pubgPackage && monkey -p $pubgPackage -c android.intent.category.LAUNCHER 1"
+        return ShellUtils.execRoot(command)
+    }
+
     fun deleteAccount(openid: String): Boolean {
         val dir = getAccountDir(openid)
         return dir.deleteRecursively()
