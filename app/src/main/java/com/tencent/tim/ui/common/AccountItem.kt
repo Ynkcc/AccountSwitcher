@@ -42,7 +42,10 @@ fun AccountItem(
                 Text(text = "下线时间: ${account.lastLogoutText}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
             
-            IconButton(onClick = onPlay) {
+            IconButton(onClick = {
+                onSelected()
+                onPlay()
+            }) {
                 Icon(
                     Icons.Default.PlayArrow, 
                     contentDescription = "切换并进入游戏", 
