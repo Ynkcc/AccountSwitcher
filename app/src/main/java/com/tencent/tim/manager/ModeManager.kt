@@ -23,12 +23,12 @@ class ModeManager(
     val currentMode: StateFlow<OperationMode> = _currentMode.asStateFlow()
 
     /**
-     * 检查可用模式，优先选择 Shizuku
+     * 检查可用模式，优先选择 Root
      */
     fun checkAvailability() {
         when {
-            isShizukuAvailable() -> _currentMode.value = OperationMode.SHIZUKU
             isRootAvailable() -> _currentMode.value = OperationMode.ROOT
+            isShizukuAvailable() -> _currentMode.value = OperationMode.SHIZUKU
             else -> _currentMode.value = OperationMode.NONE
         }
     }
