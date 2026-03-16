@@ -1,22 +1,18 @@
-name: Android CI
+name: Android Release
 
 on:
   push:
-    branches:
-      - main
-      - master
-  pull_request:
-  workflow_dispatch:
+    tags:
+      - '*'
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: android_build
     env:
       RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
       RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
@@ -43,18 +39,13 @@ jobs:
       - name: Grant execute permission for Gradle
         run: chmod +x gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon -Pkotlin.compiler.execution.strategy=in-process
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+      - name: Validate signing secrets
+        run: |
+          test -n "$RELEASE_KEYSTORE_BASE64"
+          test -n "$RELEASE_STORE_PASSWORD"
+          test -n "$RELEASE_KEY_PASSWORD"
 
       - name: Prepare signing files
-        if: ${{ env.RELEASE_KEYSTORE_BASE64 != '' && env.RELEASE_STORE_PASSWORD != '' && env.RELEASE_KEY_PASSWORD != '' }}
         run: |
           echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
           cat <<EOF > local.properties
@@ -63,13 +54,19 @@ jobs:
           EOF
 
       - name: Build release APK
-        if: ${{ env.RELEASE_KEYSTORE_BASE64 != '' && env.RELEASE_STORE_PASSWORD != '' && env.RELEASE_KEY_PASSWORD != '' }}
         run: ./gradlew assembleRelease --stacktrace --no-daemon -Pkotlin.compiler.execution.strategy=in-process
 
-      - name: Upload release APK
-        if: ${{ env.RELEASE_KEYSTORE_BASE64 != '' && env.RELEASE_STORE_PASSWORD != '' && env.RELEASE_KEY_PASSWORD != '' }}
+      - name: Upload release APK artifact
         uses: actions/upload-artifact@v7
         with:
           name: app-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: app/build/outputs/apk/release/*.apk
+          generate_release_notes: true
