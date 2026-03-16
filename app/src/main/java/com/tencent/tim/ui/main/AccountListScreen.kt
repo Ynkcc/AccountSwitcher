@@ -3,11 +3,11 @@ package com.tencent.tim.ui.main
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
-import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
@@ -601,13 +601,15 @@ fun SwipeToRevealDelete(
             anchors = DraggableAnchors {
                 DragValue.Start at 0f
                 DragValue.End at -deleteBtnWidthPx
-            },
-            positionalThreshold = { distance: Float -> distance * 0.5f },
-            velocityThreshold = { with(density) { 100.dp.toPx() } },
-            snapAnimationSpec = tween(),
-            decayAnimationSpec = exponentialDecay(),
+            }
         )
     }
+
+    val flingBehavior = AnchoredDraggableDefaults.flingBehavior(
+        state = state,
+        positionalThreshold = { distance: Float -> distance * 0.5f },
+        animationSpec = tween(),
+    )
 
     Box(
         modifier = Modifier
@@ -641,7 +643,11 @@ fun SwipeToRevealDelete(
                         y = 0
                     )
                 }
-                .anchoredDraggable(state, Orientation.Horizontal)
+                .anchoredDraggable(
+                    state = state,
+                    orientation = Orientation.Horizontal,
+                    flingBehavior = flingBehavior
+                )
                 .background(MaterialTheme.colorScheme.surface)
         ) {
             content()

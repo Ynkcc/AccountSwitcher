@@ -1,8 +1,8 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -17,9 +17,18 @@ val localProperties = Properties().apply {
     }
 }
 
-val releaseStoreFilePath =
-    localProperties.getProperty("release.storeFile")
-        ?: "/home/ynk/Desktop/qy/sign/Ynkcc.jks"
+val releaseStoreFile =
+    (System.getenv("RELEASE_KEYSTORE_BASE64")
+        ?: localProperties.getProperty("release.keystoreBase64")
+        ?: (project.findProperty("RELEASE_KEYSTORE_BASE64") as String?))
+        ?.takeIf { it.isNotBlank() }
+        ?.let { encodedKeystore ->
+            val decodedStoreFile = layout.buildDirectory.file("keystore/release.jks").get().asFile
+            decodedStoreFile.parentFile?.mkdirs()
+            decodedStoreFile.writeBytes(Base64.getDecoder().decode(encodedKeystore.trim()))
+            decodedStoreFile
+        }
+        ?: localProperties.getProperty("release.storeFile")?.takeIf { it.isNotBlank() }?.let(::file)
 val releaseStorePassword =
     System.getenv("RELEASE_STORE_PASSWORD")
         ?: localProperties.getProperty("release.storePassword")
@@ -48,7 +57,7 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file(releaseStoreFilePath)
+            storeFile = releaseStoreFile
             storePassword = releaseStorePassword
             keyAlias = releaseKeyAlias
             keyPassword = releaseKeyPassword

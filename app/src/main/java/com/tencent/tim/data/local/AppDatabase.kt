@@ -11,14 +11,14 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE accounts ADD COLUMN isSelected INTEGER NOT NULL DEFAULT 0")
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE accounts ADD COLUMN isSelected INTEGER NOT NULL DEFAULT 0")
             }
         }
 
         val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS accounts_new (
                         openid TEXT NOT NULL,
@@ -54,7 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
-                database.execSQL(
+                db.execSQL(
                     """
                     INSERT INTO accounts_new (
                         openid,
@@ -120,8 +120,8 @@ abstract class AppDatabase : RoomDatabase() {
                     FROM accounts
                     """.trimIndent()
                 )
-                database.execSQL("DROP TABLE accounts")
-                database.execSQL("ALTER TABLE accounts_new RENAME TO accounts")
+                db.execSQL("DROP TABLE accounts")
+                db.execSQL("ALTER TABLE accounts_new RENAME TO accounts")
             }
         }
     }
