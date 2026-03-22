@@ -12,6 +12,7 @@ import com.tencent.tim.domain.AccountInteractor
 import com.tencent.tim.manager.ModeManager
 import com.tencent.tim.manager.QQControlManager
 import com.tencent.tim.manager.QQControlManagerImpl
+import com.tencent.tim.manager.StoragePermissionManager
 import com.tencent.tim.ui.main.MainViewModel
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -38,6 +39,7 @@ val appModule = module {
     // System
     single { RootManager() }
     single { ModeManager(androidContext(), get()) }
+    single { StoragePermissionManager(androidContext()) }
     single<QQControlManager> { QQControlManagerImpl(get(), get()) }
 
     // Network
@@ -67,6 +69,6 @@ val appModule = module {
     single { AccountInteractor(get()) }
 
     // ViewModels
-    viewModel { MainViewModel(get(), get(), get()) }
+    viewModel { MainViewModel(get(), get(), get(), get()) }
 }
 

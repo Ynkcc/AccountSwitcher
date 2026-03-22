@@ -6,6 +6,7 @@ import com.tencent.tim.domain.AccountInteractor
 import com.tencent.tim.manager.ModeManager
 import com.tencent.tim.manager.OperationMode
 import com.tencent.tim.manager.QQControlManager
+import com.tencent.tim.manager.StoragePermissionManager
 import com.tencent.tim.ui.model.AccountUiModel
 import com.tencent.tim.ui.model.toUiModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,6 +23,7 @@ import java.util.Locale
 class MainViewModel(
     private val interactor: AccountInteractor,
     private val modeManager: ModeManager,
+    private val storagePermissionManager: StoragePermissionManager,
     private val qqControlManager: QQControlManager
 ) : ViewModel() {
     companion object {
@@ -39,6 +41,10 @@ class MainViewModel(
         handleIntent(MainIntent.LoadAccounts)
         handleIntent(MainIntent.CheckModes)
         
+        // 启动时检查并同步存储权限状态
+        val isGranted = storagePermissionManager.isPermissionGranted()
+        _state.update { it.copy(isStoragePermissionGranted = isGranted) }
+
         // 启动时请求 Shizuku 授权 (如果 Shizuku 已启动但未授权)
         viewModelScope.launch {
             if (modeManager.isShizukuAlive() && !modeManager.isShizukuAvailable()) {
