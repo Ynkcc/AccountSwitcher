@@ -9,7 +9,8 @@ data class MainState(
     val error: String? = null,
     val operationMode: OperationMode = OperationMode.NONE,
     val isShizukuAvailable: Boolean = false,
-    val isRootAvailable: Boolean = false
+    val isRootAvailable: Boolean = false,
+    val isStoragePermissionGranted: Boolean = false
 )
 
 sealed class MainIntent {
@@ -17,8 +18,8 @@ sealed class MainIntent {
     object SaveCurrentAccount : MainIntent()
     object RequestExportAccountsToFile : MainIntent()
     object RequestImportAccountsFromFile : MainIntent()
-    data class ExportAccountsToFile(val uriString: String) : MainIntent()
-    data class ImportAccountsFromFile(val uriString: String) : MainIntent()
+    data class ExportAccountsToFile(val filePath: String) : MainIntent()
+    data class ImportAccountsFromFile(val filePath: String) : MainIntent()
     data class SetSelectedAccount(val openid: String) : MainIntent()
     data class ShowAccountDetails(val account: AccountUiModel) : MainIntent()
     data class SwitchAndPlay(val openid: String) : MainIntent()
@@ -36,11 +37,13 @@ sealed class MainIntent {
     ) : MainIntent()
     object RequestShizukuPermission : MainIntent()
     object CheckModes : MainIntent()
+    data class PermissionResult(val granted: Boolean) : MainIntent()
 }
 
 sealed class MainEffect {
     data class ShowToast(val message: String) : MainEffect()
     data class ShowAccountDetails(val account: AccountUiModel) : MainEffect()
-    data class PickExportAccountsFile(val suggestedFileName: String) : MainEffect()
-    object PickImportAccountsFile : MainEffect()
+    data class PickExportPath(val suggestedFileName: String) : MainEffect()
+    object PickImportFile : MainEffect()
+    object RequestStoragePermission : MainEffect()
 }

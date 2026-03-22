@@ -53,18 +53,22 @@ fun AccountListScreen(
     val context = LocalContext.current
     var showDetailsAccount by remember { mutableStateOf<AccountUiModel?>(null) }
     var showManualImportDialog by remember { mutableStateOf(false) }
-    val exportFileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        uri?.let {
-            viewModel.handleIntent(MainIntent.ExportAccountsToFile(it.toString()))
-        }
+    
+    var showExportPicker by remember { mutableStateOf<String?>(null) }
+    var showImportPicker by remember { mutableStateOf(false) }
+
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.values.all { it }
+        viewModel.handleIntent(MainIntent.PermissionResult(granted))
     }
-    val importFileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let {
-            viewModel.handleIntent(MainIntent.ImportAccountsFromFile(it.toString()))
+
+    val manageExternalStorageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            viewModel.handleIntent(MainIntent.PermissionResult(android.os.Environment.isExternalStorageManager()))
         }
     }
 
@@ -73,12 +77,54 @@ fun AccountListScreen(
             when (effect) {
                 is MainEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
                 is MainEffect.ShowAccountDetails -> showDetailsAccount = effect.account
-                is MainEffect.PickExportAccountsFile -> exportFileLauncher.launch(effect.suggestedFileName)
-                is MainEffect.PickImportAccountsFile -> importFileLauncher.launch(
-                    arrayOf("application/json", "text/plain", "application/octet-stream")
-                )
+                is MainEffect.PickExportPath -> showExportPicker = effect.suggestedFileName
+                is MainEffect.PickImportFile -> showImportPicker = true
+                is MainEffect.RequestStoragePermission -> {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        try {
+                            val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                data = android.net.Uri.parse("package:${context.packageName}")
+                            }
+                            manageExternalStorageLauncher.launch(intent)
+                        } catch (e: Exception) {
+                            val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                            manageExternalStorageLauncher.launch(intent)
+                        }
+                    } else {
+                        storagePermissionLauncher.launch(
+                            arrayOf(
+                                android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                            )
+                        )
+                    }
+                }
             }
         }
+    }
+
+    if (showExportPicker != null) {
+        val suggestedName = showExportPicker!!
+        com.tencent.tim.ui.common.FilePicker(
+            mode = com.tencent.tim.ui.common.PickerMode.DIRECTORY,
+            suggestedFileName = suggestedName,
+            onDismiss = { showExportPicker = null },
+            onConfirm = { path ->
+                viewModel.handleIntent(MainIntent.ExportAccountsToFile(path))
+                showExportPicker = null
+            }
+        )
+    }
+
+    if (showImportPicker) {
+        com.tencent.tim.ui.common.FilePicker(
+            mode = com.tencent.tim.ui.common.PickerMode.FILE,
+            onDismiss = { showImportPicker = false },
+            onConfirm = { path ->
+                viewModel.handleIntent(MainIntent.ImportAccountsFromFile(path))
+                showImportPicker = false
+            }
+        )
     }
 
     if (showDetailsAccount != null) {

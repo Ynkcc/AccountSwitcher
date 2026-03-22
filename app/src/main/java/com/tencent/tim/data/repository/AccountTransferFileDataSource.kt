@@ -1,7 +1,6 @@
 package com.tencent.tim.data.repository
 
 import android.content.Context
-import android.net.Uri
 import com.tencent.tim.data.local.AccountEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,6 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.File
 
 @Serializable
 data class AccountTransferPayload(
@@ -35,34 +35,28 @@ class AccountTransferFileDataSource(
         }
     }
 
-    suspend fun exportToUri(
-        uriString: String,
+    suspend fun exportToFile(
+        filePath: String,
         payload: AccountTransferPayload
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val uri = parseUri(uriString)
+            val file = File(filePath)
+            // 确保父目录存在
+            file.parentFile?.mkdirs()
+            
             val content = jsonParser.encodeToString(payload)
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(content.toByteArray(Charsets.UTF_8))
-                outputStream.flush()
-            } ?: error("无法打开导出文件")
+            file.writeText(content, Charsets.UTF_8)
         }
     }
 
-    suspend fun importFromUri(uriString: String): Result<AccountTransferPayload> = withContext(Dispatchers.IO) {
+    suspend fun importFromFile(filePath: String): Result<AccountTransferPayload> = withContext(Dispatchers.IO) {
         runCatching {
-            val uri = parseUri(uriString)
-            val content = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use {
-                it.readText()
-            } ?: error("无法打开导入文件")
-
+            val file = File(filePath)
+            require(file.exists()) { "文件不存在: $filePath" }
+            
+            val content = file.readText(Charsets.UTF_8)
             parsePayload(content)
         }
-    }
-
-    private fun parseUri(uriString: String): Uri {
-        require(uriString.isNotBlank()) { "文件地址无效" }
-        return Uri.parse(uriString)
     }
 
     private fun parsePayload(rawContent: String): AccountTransferPayload {

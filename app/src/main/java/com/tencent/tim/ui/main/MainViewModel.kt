@@ -60,8 +60,8 @@ class MainViewModel(
             is MainIntent.SaveCurrentAccount -> saveAccount()
             is MainIntent.RequestExportAccountsToFile -> requestExportAccountsToFile()
             is MainIntent.RequestImportAccountsFromFile -> requestImportAccountsFromFile()
-            is MainIntent.ExportAccountsToFile -> exportAccountsToFile(intent.uriString)
-            is MainIntent.ImportAccountsFromFile -> importAccountsFromFile(intent.uriString)
+            is MainIntent.ExportAccountsToFile -> exportAccountsToFile(intent.filePath)
+            is MainIntent.ImportAccountsFromFile -> importAccountsFromFile(intent.filePath)
             is MainIntent.SetSelectedAccount -> setSelectedAccount(intent.openid)
             is MainIntent.ShowAccountDetails -> showAccountDetails(intent.account)
             is MainIntent.SwitchAndPlay -> switchAndPlay(intent.openid)
@@ -79,6 +79,7 @@ class MainViewModel(
             )
             is MainIntent.RequestShizukuPermission -> requestShizukuPermission()
             is MainIntent.CheckModes -> checkModes()
+            is MainIntent.PermissionResult -> onPermissionResult(intent.granted)
         }
     }
 
@@ -177,6 +178,20 @@ class MainViewModel(
         }
     }
 
+    private fun onPermissionResult(granted: Boolean) {
+        _state.update { it.copy(isStoragePermissionGranted = granted) }
+        if (granted) {
+            viewModelScope.launch {
+                _effect.emit(MainEffect.ShowToast("存储权限已授予"))
+            }
+        }
+    }
+
+    private fun checkStoragePermission(): Boolean {
+        // 这部分逻辑将由 Activity/Compose 辅助完成，ViewModel 仅保存状态
+        return _state.value.isStoragePermissionGranted
+    }
+
     private fun requestExportAccountsToFile() {
         viewModelScope.launch {
             if (_state.value.accounts.isEmpty()) {
@@ -184,23 +199,32 @@ class MainViewModel(
                 return@launch
             }
 
+            if (!checkStoragePermission()) {
+                _effect.emit(MainEffect.RequestStoragePermission)
+                return@launch
+            }
+
             val fileName = "accountswitcher_accounts_${LocalDateTime.now().format(exportFileNameFormatter)}.json"
-            _effect.emit(MainEffect.PickExportAccountsFile(fileName))
+            _effect.emit(MainEffect.PickExportPath(fileName))
         }
     }
 
     private fun requestImportAccountsFromFile() {
         viewModelScope.launch {
-            _effect.emit(MainEffect.PickImportAccountsFile)
+            if (!checkStoragePermission()) {
+                _effect.emit(MainEffect.RequestStoragePermission)
+                return@launch
+            }
+            _effect.emit(MainEffect.PickImportFile)
         }
     }
 
-    private fun exportAccountsToFile(uriString: String) {
+    private fun exportAccountsToFile(filePath: String) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            interactor.exportAccountsToFile(uriString)
+            interactor.exportAccountsToFile(filePath)
                 .onSuccess { count ->
-                    _effect.emit(MainEffect.ShowToast("成功导出 $count 个账号"))
+                    _effect.emit(MainEffect.ShowToast("成功导出 $count 个账号到: $filePath"))
                 }
                 .onFailure { error ->
                     _effect.emit(MainEffect.ShowToast("导出失败: ${error.message}"))
@@ -209,10 +233,10 @@ class MainViewModel(
         }
     }
 
-    private fun importAccountsFromFile(uriString: String) {
+    private fun importAccountsFromFile(filePath: String) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            interactor.importAccountsFromFile(uriString)
+            interactor.importAccountsFromFile(filePath)
                 .onSuccess { summary ->
                     val message = buildString {
                         append("导入完成：新增 ${summary.insertedCount}，更新 ${summary.updatedCount}，跳过 ${summary.skippedCount}")

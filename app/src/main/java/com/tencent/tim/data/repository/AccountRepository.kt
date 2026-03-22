@@ -119,20 +119,20 @@ class AccountRepository(
         refreshedCount to accounts.size
     }
 
-    suspend fun exportAccountsToFile(uriString: String): Result<Int> = runCatching {
+    suspend fun exportAccountsToFile(filePath: String): Result<Int> = runCatching {
         val accounts = allAccounts.first()
         require(accounts.isNotEmpty()) { "暂无账号可导出" }
 
-        transferFileDataSource.exportToUri(
-            uriString = uriString,
+        transferFileDataSource.exportToFile(
+            filePath = filePath,
             payload = AccountTransferPayload(accounts = accounts)
         ).getOrThrow()
 
         accounts.size
     }
 
-    suspend fun importAccountsFromFile(uriString: String): Result<AccountImportSummary> = runCatching {
-        val payload = transferFileDataSource.importFromUri(uriString).getOrThrow()
+    suspend fun importAccountsFromFile(filePath: String): Result<AccountImportSummary> = runCatching {
+        val payload = transferFileDataSource.importFromFile(filePath).getOrThrow()
         require(payload.accounts.isNotEmpty()) { "导入文件中没有账号数据" }
 
         var insertedCount = 0
